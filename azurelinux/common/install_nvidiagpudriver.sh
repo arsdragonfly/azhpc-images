@@ -138,6 +138,9 @@ $AZURE_LINUX_COMMON_DIR/install_nvidia_fabric_manager.sh
 # Install libnvidia-nscq
 tdnf install -y libnvidia-nscq
 
+# temporary workaround for nvidia-smi OOM issue https://forums.developer.nvidia.com/t/nvidia-smi-uses-all-of-ram-and-swap/295639
+systemctl disable nvidia-persistenced
+
 # cleanup downloaded files
 rm -rf *.run *tar.gz *.rpm
 rm -rf -- */
