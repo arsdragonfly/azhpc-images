@@ -11,7 +11,7 @@ tdnf -y install amdgpu-firmware \
                 amdgpu \
                 amdgpu-headers
 
-rocm_metadata=$(get_component_config "ROCM")
+rocm_metadata=$(get_component_config "rocm")
 ROCM_VERSION=$(jq -r '.version' <<< $rocm_metadata)
 ROCM_URL=$(jq -r '.url' <<< $rocm_metadata)
 # Add Azure Linux 3 ROCM repo file
