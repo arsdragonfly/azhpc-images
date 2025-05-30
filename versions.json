@@ -294,15 +294,15 @@
     },
     "rocm": {
         "azurelinux3.0": {
-            "version": "6.2.2.1",
-            "url": "https://repo.radeon.com/.hidden/c5c79c1ea1d0aa6008ddbd29c3ea1523/rocm/azurelinux3/6.2.2.1/main/"
+            "version": "6.4.1",
+            "url": "https://repo.radeon.com/rocm/azurelinux3/6.4.1/main/"
         }
     },
     "rccl": {
         "azurelinux3.0": {
-            "version": "2.20.5",
-            "url": "https://github.com/ROCm/rccl/archive/refs/tags/rocm-6.2.2.tar.gz",
-            "sha256": "2f4fdc54841e810e3f02ad96bbd113ef8fd2fca6f268ad12aa603c440737a22e"
+            "version": "2.22.3",
+            "url": "https://github.com/ROCm/rccl/archive/refs/tags/rocm-6.4.1.tar.gz",
+            "sha256": "82b7e79e1bc3a1b16214a8758ed90d8cbf7f25f524169a85f64d070cf26742e9"
         }
     }
 }
