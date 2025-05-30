@@ -9,8 +9,4 @@ set -ex
 
 tdnf repolist
 
-echo "Printing variable in install_utils"
-echo ${AZURE_LINUX_COMMON_DIR}
-pwd
-
 $AZURE_LINUX_COMMON_DIR/install_utils.sh

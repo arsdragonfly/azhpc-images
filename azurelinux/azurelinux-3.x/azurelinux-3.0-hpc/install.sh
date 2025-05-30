@@ -1,40 +1,19 @@
 #!/bin/bash
 set -ex
 
-# Check if arguments are passed
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Error: Missing arguments. Please provide both GPU type (NVIDIA/AMD) and SKU."
-    exit 1
-fi
-
 # install pre-requisites
 ./install_prerequisites.sh
 
-export GPU=$1
-export SKU=$2
-
-echo "Checking for Variables for install.sh"
-echo $GPU
-echo $SKU
-echo "Variable check done"
-
-
-# Validate GPU type
-# if [[ "$GPU" != "NVIDIA" && "$GPU" != "AMD" ]]; then
-#     echo "Error: Invalid GPU type. Please specify 'NVIDIA' or 'AMD'."
-#     exit 1
-# fi
-
-echo "Building Azure Linux 3.0 image for GPU: $GPU, SKU: $SKU"
-
-
 if [[ "$#" -gt 0 ]]; then
-   INPUT=$1
-   if [[ "$INPUT" != "NVIDIA" && "$INPUT" != "AMD" ]]; then
-       echo "Error: Invalid GPU type. Please specify 'NVIDIA' or 'AMD'."
-       exit 1
+    INPUT=$1
+    if [[ "$INPUT" != "NVIDIA" && "$INPUT" != "AMD" ]]; then
+        echo "Error: Invalid GPU type. Please specify 'NVIDIA' or 'AMD'."
+        exit 1
     fi
 fi
+
+export GPU=$1
+export SKU=$2
 
 echo "Building Azure Linux 3.0 image for GPU:$GPU SKU:$SKU"
 
@@ -48,7 +27,7 @@ source ./set_properties.sh
 # $AZURE_LINUX_COMMON_DIR/install_lustre_client.sh "8"
 
 # install compilers
- ./install_gcc.sh
+# ./install_gcc.sh
 
 #Either DOCA OFED (OR) MOFED needed not both
 # install DOCA OFED
@@ -83,19 +62,25 @@ if [ "$GPU" = "AMD" ]; then
     systemctl restart docker
 fi
 
-
 # install AMD tuned libraries
 $COMMON_DIR/install_amd_libs.sh
 
 # install Intel libraries
 $COMMON_DIR/install_intel_libs.sh
 
+if [ "$GPU" = "AMD" ]; then
+    #install rocm software stack
+    $AZURE_LINUX_COMMON_DIR/install_rocm.sh
+
+    #install rccl and rccl-tests
+    $AZURE_LINUX_COMMON_DIR/install_rccl.sh
+fi
+
 # cleanup downloaded tarballs - clear some space
 rm -rf *.tgz *.bz2 *.tbz *.tar.gz *.run *.deb *_offline.sh
 rm -rf /tmp/MLNX_OFED_LINUX* /tmp/*conf*
 rm -rf /var/intel/ /var/cache/*
 rm -Rf -- */
-
 
 # optimizations
 $AZURE_LINUX_COMMON_DIR/hpc-tuning.sh
@@ -119,7 +104,7 @@ $COMMON_DIR/install_hpcdiag.sh
 $COMMON_DIR/install_monitoring_tools.sh
 
 # install Azure/NHC Health Checks
-$COMMON_DIR/install_health_checks.sh
+$COMMON_DIR/install_health_checks.sh $GPU
 
 # copy test file
 $COMMON_DIR/copy_test_file.sh
@@ -129,14 +114,6 @@ $COMMON_DIR/copy_test_file.sh
 
 # SKU Customization
 $COMMON_DIR/setup_sku_customizations.sh
-
-if [ "$GPU" = "AMD" ]; then
-    #install rocm software stack
-    $AZURE_LINUX_COMMON_DIR/install_rocm.sh
-    
-    #install rccl and rccl-tests
-    $AZURE_LINUX_COMMON_DIR/install_rccl.sh
-fi
 
 # clear history
 # Uncomment the line below if you are running this on a VM

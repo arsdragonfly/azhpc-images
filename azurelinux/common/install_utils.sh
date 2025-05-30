@@ -1,9 +1,6 @@
 #!/bin/bash
 set -ex
 
-echo "Variable name in install_utils for utilities"
-echo ${COMMON_DIR}
-
 source ${COMMON_DIR}/utilities.sh
 
 # Install Kernel dependencies
@@ -68,7 +65,12 @@ tdnf install -y numactl \
     nano \
     device-mapper-multipath \
     mdadm \
-    ca-certificates-tools
+    ca-certificates-tools \
+    git \
+    gtest-devel \
+    gmock-devel \
+    hwloc-libs \
+    hwloc-devel
 
 # Disable kernel updates
 echo "exclude=kernel* kmod*" | tee -a /etc/dnf/dnf.conf

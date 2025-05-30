@@ -71,7 +71,7 @@
             "sha256": "34e826fea03d6505b50909959ed029282a6238c75830fbe5b2bc15442cf8f8b5"
         },
         "azurelinux3.0": {
-            "version": "24.10.0.7.0",
+            "version": "24.10.0.7.0.1",
             "sha256": "34e826fea03d6505b50909959ed029282a6238c75830fbe5b2bc15442cf8f8b5"
         }
     },
@@ -135,13 +135,13 @@
         },
         "azurelinux3.0": {
             "driver": {
-                "version": "560.35.03",
-                "sha256": "479028774249cbe119a2a65bba39d52cd4ad17c61491b9b2a7f8ce9e75ae1248"
+                "version": "570.124.06",
+                "sha256": "1818c90657d17e510de9fa032385ff7e99063e848e901cb4636ee71c8b339313"
             },
             "fabricmanager": {
                 "distribution": "azl3",
-                "version": "560.35.03-2",
-                "sha256": "9d6d246ce6e6af1710b9d0d2bc213143f1f4c914ff6d6f85822301f9d9a2182e"        
+                "version": "570.124.06",
+                "sha256": "e2d359986ca733c568f5a21fd7686f1b002b09637bf1b3a596333bd5ffbc3edb"
             }
         }
     },
@@ -178,12 +178,12 @@
         },
         "azurelinux3.0": {
             "driver": {
-                "version": "12.6.2",
+                "version": "12.8",
                 "distribution": "azl3"
             },
             "samples": {
-                "version": "12.5",
-                "sha256": "5c40cc096706045b067ec5897f039403014aa7a39b970905698466a2d029b972"
+                "version": "12.8",
+                "sha256": "fe82484f9a87334075498f4e023a304cc70f240a285c11678f720f0a1e54a89d"
             }   
         }
     },
@@ -222,16 +222,6 @@
             "version": "3.3.9"
         }
     },
-    "ROCM": {
-        "common": {
-            "version": "6.2.2"
-        }
-    },
-    "RCCL": {
-        "common": {
-            "version": "2.23.4"
-        }
-    },
     "intel_one_mkl": {
         "common": {
             "version": "2024.2.1.105",
@@ -247,30 +237,6 @@
         "ubuntu22.04": {
             "version": "2.11.1.4",
             "sha256": "956f12e31b0903f304cc070ddcbe4c8130c10e7ccc2597061e6467e911bc085d"
-        },
-        "azurelinux3.0": {
-            "version": "2.11.8.8",
-            "sha256": "e02b34ae50a81d7e7d8d0e3bd2b9abae1294febe489b398974186f7723149ae1"
-        }
-    },
-    "waagent_extensions": {
-        "ubuntu20.04": {
-            "version": "2.11.1.4",
-            "sha256": "956f12e31b0903f304cc070ddcbe4c8130c10e7ccc2597061e6467e911bc085d"
-        },
-        "ubuntu22.04": {
-            "version": "2.11.1.4",
-            "sha256": "956f12e31b0903f304cc070ddcbe4c8130c10e7ccc2597061e6467e911bc085d"
-        },
-        "azurelinux3.0": {
-            "version": "2.12.0.2",
-            "sha256": "e02b34ae50a81d7e7d8d0e3bd2b9abae1294febe489b398974186f7723149ae1"
-        }
-    },
-    "moby_engine": {
-        "azurelinux3.0": {
-            "version": "25.0.3-11",
-            "sha256": "ec5629890e1c03bd88bc405e440680584a1dc6c06696025084c2641dc9b4f24b"
         }
     },
     "moneo": {
@@ -307,7 +273,7 @@
     },
     "aznhc": {
         "common": {
-            "version": "0.4.2"
+            "version": "0.4.4"
         }
     },
     "rdma_core": {
@@ -324,6 +290,19 @@
         "common": {
             "version": "2.0.8",
             "sha256": "5f2e0947ba750a02cb7d4323ed8d0eb2c83c3df33674b6e14f6fa72f88cf267f"
+        }
+    },
+    "rocm": {
+        "azurelinux3.0": {
+            "version": "6.2.2.1",
+            "url": "https://repo.radeon.com/.hidden/c5c79c1ea1d0aa6008ddbd29c3ea1523/rocm/azurelinux3/6.2.2.1/main/"
+        }
+    },
+    "rccl": {
+        "azurelinux3.0": {
+            "version": "2.20.5",
+            "url": "https://github.com/ROCm/rccl/archive/refs/tags/rocm-6.2.2.tar.gz",
+            "sha256": "2f4fdc54841e810e3f02ad96bbd113ef8fd2fca6f268ad12aa603c440737a22e"
         }
     }
 }

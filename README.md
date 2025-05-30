@@ -1,39 +1,41 @@
-[![Build Status](https://dev.azure.com/hpc-platform-team/hpc-image-val/_apis/build/status/hpc-image-build?branchName=master)](https://dev.azure.com/hpc-platform-team/hpc-image-val/_build/latest?definitionId=3&branchName=master)
+# Below are the steps to use Packer to build an HPC test image on an Azure Linux 3.0 Gen2 marketplace image.
+  * (Reference: https://github.com/Azure/azhpc-images)
 
-|OS Version|Status Badge|
-|----------|------------|
-|Ubuntu 20.04|[![Build Status](https://dev.azure.com/hpc-platform-team/hpc-image-val/_apis/build/status/hpc-image-build?branchName=master&jobName=Validate_Virtual_Machine&configuration=Validate_Virtual_Machine%20ubuntu_20.04)](https://dev.azure.com/hpc-platform-team/hpc-image-val/_build/latest?definitionId=3&branchName=master)
-|Ubuntu 22.04|[![Build Status](https://dev.azure.com/hpc-platform-team/hpc-image-val/_apis/build/status/hpc-image-build?branchName=master&jobName=Validate_Virtual_Machine&configuration=Validate_Virtual_Machine%20ubuntu_22.04)](https://dev.azure.com/hpc-platform-team/hpc-image-val/_build/latest?definitionId=3&branchName=master)
-|AlmaLinux 8.10|[![Build Status](https://dev.azure.com/hpc-platform-team/hpc-image-val/_apis/build/status/hpc-image-build?branchName=master&jobName=Validate_Virtual_Machine&configuration=Validate_Virtual_Machine%20alma8.10)](https://dev.azure.com/hpc-platform-team/hpc-image-val/_build/latest?definitionId=3&branchName=master)
+1) Install Packer on your development machine. Packer uses credentials to the subscription to boot a marketplace image, SSH into it, customize it, and then save it as a managed image under the provided managed resource group. 
+   You can find instructions on installing Packer here: * https://learn.hashicorp.com/tutorials/packer/get-started-install-cli.
 
-# Azure HPC/AI VM Images
+2) Create a managed_image_resource_group_name in your subscription. Packer will use this managed_image_resource_group_name to save the customized managed image. This needs to be in the same region as the location specified in `azure-linux-hpc-image-vars-gen2.json`.
 
-This repository houses a collection of scripts meticulously crafted for installing High-Performance Computing (HPC) and Artificial Intelligence (AI) libraries, along with tools essential for building Azure HPC/AI images. Whether you're provisioning compute-intensive workloads or crafting advanced AI models in the cloud, these scripts streamline the process, ensuring efficiency and reliability in your deployments.
+3) Use Azure CLI to create the service principal that Packer will use to authenticate with our subscription by running the following command:
+   ```
+   az ad sp create-for-rbac --name myServicePrincipalName --role roleName --scopes /subscriptions/mySubscriptionID/resourceGroups/myResourceGroupName --create-cert
+   ```
 
-Following are the current supported HPC/AI VM images that are available in Azure Marketplace:
-- [Ubuntu-HPC](https://azuremarketplace.microsoft.com/en-us/marketplace/apps/microsoft-dsvm.ubuntu-hpc) 22.04 (microsoft-dsvm:ubuntu-hpc:2204:latest)
-- [Ubuntu-HPC](https://azuremarketplace.microsoft.com/en-us/marketplace/apps/microsoft-dsvm.ubuntu-hpc) 20.04 (microsoft-dsvm:ubuntu-hpc:2004:latest)
-- [AlmaLinux-HPC](https://azuremarketplace.microsoft.com/en-us/marketplace/apps/almalinux.almalinux-hpc) 8.10 (almalinux:almalinux-hpc:8_10-hpc-gen2:latest)
+4) Customize the `azure-linux-hpc-image-vars-gen2.json` file with the required details:
+   ```
+   "subscription_id":  "",
+   "tenant_id":      "",
+   "client_id": "",
+   "client_cert_path": "",
+   "location": "",
+   "vm_size": "",
+   "managed_image_resource_group_name": "",
+   "managed_image_name": ""
 
-# How to Use
+   ```
 
-The high level steps to create your own HPC images using our repository are:
-1. Deploy a VM ([tutorial](https://learn.microsoft.com/en-us/azure/virtual-machines/)).
-2. Run install.sh (pick the corresponding install.sh in our repository for your OS, e.g., [Ubuntu 22.04](ubuntu/ubuntu-22.x/ubuntu-22.04-hpc/install.sh)).
-3. Generate an image from the VM ([tutorial](https://learn.microsoft.com/en-us/azure/virtual-machines/linux/tutorial-custom-images)).
+5) Provide values in `azure-linux-hpc-image-vars-gen2.json` for subscription, client_id, client_cert_path, etc., which are needed for the Packer build. 
+    **Do not check these in anywhere as they are credentials to our subscription. If you need to run Packer from a pipeline, use secure pipeline variables to store this information. If it leaks, we must delete it from our access control (IAM) tab on the subscription immediately.**
 
-# Kernel Update/Patching
+6) Run Packer with the `azure-linux-hpc-image-gen2.json` config filled with variables from your `azure-linux-hpc-image-vars-gen2.json`. This will take some time to complete the build. Use the following command:
+   ```
+   packer build -var-file ./.pipelines/azure-linux-hpc-image-vars-gen2.json ./.pipelines/azure-linux-hpc-image-gen2.json
 
-Generally, OS kernel updates break compatibility of HPC components we install, e.g., Lustre. In our HPC images, the kernel is excluded from updates for this reason.
+   ```
+   * An important aspect of this process is the custom_data_file named `sha1rsa_custom_data`, which allows sshd to accept SSH connections from Packer by reallowing less secure pubkey algorithms. Note that in the script.sh file, we remove these temporary configurations before the VHD is captured.
 
-- Ubuntu 22.04: [https://github.com/Azure/azhpc-images/blob/master/ubuntu/ubuntu-22.x/ubuntu-22.04-hpc/install_prerequisites.sh#L5](https://github.com/Azure/azhpc-images/blob/master/ubuntu/ubuntu-22.x/ubuntu-22.04-hpc/install_prerequisites.sh#L5)
-- AlmaLinux 8.10: [https://github.com/Azure/azhpc-images/blob/master/alma/common/install_utils.sh#L66](https://github.com/Azure/azhpc-images/blob/master/alma/common/install_utils.sh#L67)
+7) After Packer runs, the Azure Linux 3.0 HPC test Gen2 based managed image will be available in the specified managed resource group.
 
-We implement it this way, since lots of kernel dependencies are installed which are highly coupled to a specific kernel version. Thus, kernel updates are not encouraged in our HPC images.
-
-Our HPC image releasing primary cadence is quarterly. In between releases, if we get flagged for security issues, we quickly apply the patch and release a hotfix in an adhoc fashion which can be done within a week or two.
-
-Please keep using our latest HPC images. If any compliance issues (e.g., security bugs) are identified, please also report them (and patches, if any) to us. We will apply the fix and release the patched images as a hotfix.
 
 # Contributing
 

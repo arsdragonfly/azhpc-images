@@ -1,24 +1,15 @@
 #!/bin/bash
-set -ex
-source ${COMMON_DIR}/utilities.sh
-
+# set -ex
 
 tdnf install -y azurelinux-repos-amd
 tdnf repolist --refresh
 
 tdnf -y install kernel-drivers-gpu-$(uname -r)
 # Install AMD GPU OOT modules and firmware packages from PMC
-# tdnf -y install amdgpu-firmware \
-#                 amdgpu \
-#                 amdgpu-headers
-# tdnf -y install https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-6.10.5.60302_2109964-1_6.6.78.1.3.azl3.x86_64.rpm \
-#  https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-firmware-6.10.5.60302_2109964-1.azl3.noarch.rpm  \
-#  https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-headers-6.10.5.60302_2109964-1.azl3.noarch.rpm
-               
-tdnf -y install https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-6.10.5.60302_2109964-1_6.6.82.1.1.azl3.x86_64.rpm https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-firmware-6.10.5.60302_2109964-1.azl3.noarch.rpm https://packages.microsoft.com/azurelinux/3.0/prod/amd/x86_64/Packages/a/amdgpu-headers-6.10.5.60302_2109964-1.azl3.noarch.rpm
+tdnf -y install amdgpu-firmware \
+                amdgpu \
+                amdgpu-headers
 
-rocm_metadata=$(get_component_config "ROCM")
-ROCM_VERSION=$(jq -r '.version' <<< $rocm_metadata)
 # Add Azure Linux 3 ROCM repo file
 cat <<EOF >> /etc/yum.repos.d/amd_rocm.repo
 [amd_rocm]
@@ -34,12 +25,6 @@ tdnf repolist --refresh
 tdnf install -y rocm-dev rocm-validation-suite rocm-bandwidth-test
 tdnf install -y rocm-smi-lib rocm-core rocm-device-libs rocm-llvm rocm-validation-suite
  
-
-#Add self to render and video groups so they can access gpus.
-usermod -a -G render $(logname)
-usermod -a -G video $(logname)
-
-
 #Grant access to GPUs to all users via udev rules
 cat <<'EOF' > /etc/udev/rules.d/70-amdgpu.rules
 KERNEL=="kfd", MODE="0666"
@@ -47,14 +32,6 @@ SUBSYSTEM=="drm", KERNEL=="renderD*", MODE="0666"
 EOF
 
 udevadm control --reload-rules && sudo udevadm trigger
-
-#Update cloud.cfg to add the first user to the render group
-#sed -i 's/groups: \[.*/groups: \[render, adm, audio, cdrom, dialout, dip, floppy, lxd, netdev, plugdev, sudo, video\]/' /etc/cloud/cloud.cfg
-
-#add future new users to the render and video groups.
-# echo 'ADD_EXTRA_GROUPS=1' | tee -a /etc/adduser.conf
-# echo 'EXTRA_GROUPS=video' | tee -a /etc/adduser.conf
-# echo 'EXTRA_GROUPS=render' | tee -a /etc/adduser.conf
 
 #add nofile limits
 string_so="*               soft    nofile          1048576"
@@ -72,19 +49,26 @@ mv tmplimits.conf /etc/security/limits.conf
 # echo blacklist amdgpu | tee -a /etc/modprobe.d/blacklist.conf
 # update-initramfs -c -k $(uname -r)
 
+#1002:740c is Mi200
+#1002:74b5 is Mi300x
+#1002:74bd is Mi300HF
 echo "Writing gpu mode probe in init.d"
 cat <<'EOF' > /tmp/tempinit.sh
 #!/bin/sh
 at_count=0
 while [ $at_count -le 90 ]
 do
-    if [ $(lspci -d 1002:74b5 | wc -l) -eq 8 -o $(lspci -d 1002:740c | wc -l) -eq 16 ]; then
+    if [ $(lspci -d 1002:74b5 | wc -l) -eq 8 -o $(lspci -d 1002:74bd | wc -l) -eq 8 -o $(lspci -d 1002:740c | wc -l) -eq 16 ]; then
        echo Required number of GPUs found
        at_count=91
        sleep 120s
        echo doing Modprobe for amdgpu
-       sudo modprobe -r hyperv_drm
-       sudo modprobe amdgpu ip_block_mask=0x7f
+       if [ $(lspci -d 1002:740c | wc -l) -eq 16 ]; then
+          sudo modprobe amdgpu
+       else
+          sudo modprobe -r hyperv_drm
+          sudo modprobe amdgpu ip_block_mask=0x7f
+       fi
     else
        sleep 10
        at_count=$(($at_count + 1))
@@ -111,11 +95,3 @@ systemctl start rocmstartup
 systemctl enable rocmstartup
 
 tdnf install -y rocm-bandwidth-test
-
-echo $PWD
-
-echo "INSTALLED ROCM!! ${ROCM_VERSION}"
-$COMMON_DIR/write_component_version.sh "ROCM" $ROCM_VERSION
-
-
-

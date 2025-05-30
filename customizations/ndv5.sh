@@ -26,7 +26,7 @@ then
 fi
 
 ## load nvidia-peermem module
-#os=$(cat /etc/os-release | grep "^ID=" | awk -F"=" '{print $NF}')
-#if [ ${os} == "azurelinux" ]
-    #modprobe nvidia_peermem
-#fi
+os=$(cat /etc/os-release | grep "^ID=" | awk -F"=" '{print $NF}')
+if [ ${os} == "azurelinux" ]
+    modprobe nvidia_peermem
+fi

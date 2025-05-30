@@ -8,8 +8,6 @@ source ${COMMON_DIR}/utilities.sh
 # install rdma_rename monitor
 #
 
-tdnf install -y git
-
 pushd /tmp
 rdma_core_metadata=$(get_component_config "rdma_core")
 rdma_core_branch=$(jq -r '.branch' <<< $rdma_core_metadata)
