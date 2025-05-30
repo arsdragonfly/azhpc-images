@@ -1,5 +1,6 @@
 #!/bin/bash
 # set -ex
+source ${COMMON_DIR}/utilities.sh
 
 tdnf install -y azurelinux-repos-amd
 tdnf repolist --refresh
@@ -10,11 +11,14 @@ tdnf -y install amdgpu-firmware \
                 amdgpu \
                 amdgpu-headers
 
+rocm_metadata=$(get_component_config "ROCM")
+ROCM_VERSION=$(jq -r '.version' <<< $rocm_metadata)
+ROCM_URL=$(jq -r '.url' <<< $rocm_metadata)
 # Add Azure Linux 3 ROCM repo file
 cat <<EOF >> /etc/yum.repos.d/amd_rocm.repo
 [amd_rocm]
 name="AMD ROCM packages repo for Azure Linux 3.0"
-baseurl=https://repo.radeon.com/.hidden/c5c79c1ea1d0aa6008ddbd29c3ea1523/rocm/azurelinux3/6.2.2.1/main/
+baseurl=$ROCM_URL
 enabled=1
 repo_gpgcheck=0
 gpgcheck=0
@@ -95,3 +99,5 @@ systemctl start rocmstartup
 systemctl enable rocmstartup
 
 tdnf install -y rocm-bandwidth-test
+
+$COMMON_DIR/write_component_version.sh "ROCM" $ROCM_VERSION
