@@ -105,6 +105,7 @@ function set_module_files_path {
         ;;
     almalinux) 
         export MODULE_FILES_ROOT="/usr/share/Modules/modulefiles"
+        ;;
     azurelinux) 
         export MODULE_FILES_ROOT="/usr/share/Modules/modulefiles"
         ;;
