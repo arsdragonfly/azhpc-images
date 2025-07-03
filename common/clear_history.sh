@@ -55,9 +55,13 @@ fi
 # Remove Defender
 if [[ $distro == *"Ubuntu"* ]]
 then
-    apt-get purge -y mdatp
+    if dpkg -l | grep -qw mdatp; then
+        apt-get purge -y mdatp
+    fi
 else
-    yum remove -y mdatp
+    if yum list installed | grep -qw mdatp; then
+        yum remove -y mdatp
+    fi
 fi
 
 # Clear History
