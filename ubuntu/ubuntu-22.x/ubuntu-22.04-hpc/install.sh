@@ -98,13 +98,13 @@ source ./set_properties.sh
 # $COMMON_DIR/install_amd_libs.sh
 
 # # install Azure/NHC Health Checks
-$COMMON_DIR/install_health_checks.sh "$GPU"
+# $COMMON_DIR/install_health_checks.sh "$GPU"
 
 # # disable cloud-init
-# $UBUNTU_COMMON_DIR/disable_cloudinit.sh
+$UBUNTU_COMMON_DIR/disable_cloudinit.sh
 
 # # diable auto kernel updates
-# $UBUNTU_COMMON_DIR/disable_auto_upgrade.sh
+$UBUNTU_COMMON_DIR/disable_auto_upgrade.sh
 
 # # Disable Predictive Network interface renaming
 # $UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
