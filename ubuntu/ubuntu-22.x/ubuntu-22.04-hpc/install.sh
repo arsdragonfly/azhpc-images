@@ -68,19 +68,19 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # rm -rf /var/intel/ /var/cache/*
 # rm -Rf -- */
 
-if [ "$GPU" = "NVIDIA" ]; then
-    # Install DCGM
-    $UBUNTU_COMMON_DIR/install_dcgm.sh
-fi
+# if [ "$GPU" = "NVIDIA" ]; then
+#     # Install DCGM
+#     $UBUNTU_COMMON_DIR/install_dcgm.sh
+# fi
 
 # # install Intel libraries
-# $COMMON_DIR/install_intel_libs.sh
+$COMMON_DIR/install_intel_libs.sh
 
 # # install diagnostic script
-# $COMMON_DIR/install_hpcdiag.sh
+$COMMON_DIR/install_hpcdiag.sh
 
 # # install persistent rdma naming
-# $COMMON_DIR/install_azure_persistent_rdma_naming.sh
+$COMMON_DIR/install_azure_persistent_rdma_naming.sh
 
 # # optimizations
 # $UBUNTU_COMMON_DIR/hpc-tuning.sh
