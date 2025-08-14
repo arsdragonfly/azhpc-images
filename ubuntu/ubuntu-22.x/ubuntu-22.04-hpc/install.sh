@@ -39,21 +39,21 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # $UBUNTU_COMMON_DIR/install_doca.sh
 
 # # install PMIX
-$UBUNTU_COMMON_DIR/install_pmix.sh
+# $UBUNTU_COMMON_DIR/install_pmix.sh
 
 # # install mpi libraries
 # $UBUNTU_COMMON_DIR/install_mpis.sh
 
-# if [ "$GPU" = "NVIDIA" ]; then
-#     # install nvidia gpu driver
-#     ./install_nvidiagpudriver.sh "$SKU"
+if [ "$GPU" = "NVIDIA" ]; then
+    # install nvidia gpu driver
+    ./install_nvidiagpudriver.sh "$SKU"
     
 #     # Install NCCL
 #     $UBUNTU_COMMON_DIR/install_nccl.sh
     
 #     # Install NVIDIA docker container
 #     $UBUNTU_COMMON_DIR/install_docker.sh
-# fi
+fi
 
 # if [ "$GPU" = "AMD" ]; then
 #     # Set up docker
