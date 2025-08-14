@@ -52,7 +52,7 @@ if [ "$GPU" = "NVIDIA" ]; then
     # $UBUNTU_COMMON_DIR/install_nccl.sh
     
     # Install NVIDIA docker container
-    $UBUNTU_COMMON_DIR/install_docker.sh
+    # $UBUNTU_COMMON_DIR/install_docker.sh
 fi
 
 # if [ "$GPU" = "AMD" ]; then
@@ -68,10 +68,10 @@ fi
 # rm -rf /var/intel/ /var/cache/*
 # rm -Rf -- */
 
-# if [ "$GPU" = "NVIDIA" ]; then
-#     # Install DCGM
-#     $UBUNTU_COMMON_DIR/install_dcgm.sh
-# fi
+if [ "$GPU" = "NVIDIA" ]; then
+    # Install DCGM
+    $UBUNTU_COMMON_DIR/install_dcgm.sh
+fi
 
 # # install Intel libraries
 # $COMMON_DIR/install_intel_libs.sh
