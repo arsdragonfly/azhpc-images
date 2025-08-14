@@ -49,7 +49,7 @@ if [ "$GPU" = "NVIDIA" ]; then
     # ./install_nvidiagpudriver.sh "$SKU"
     
     # Install NCCL
-    $UBUNTU_COMMON_DIR/install_nccl.sh
+    # $UBUNTU_COMMON_DIR/install_nccl.sh
     
     # Install NVIDIA docker container
     $UBUNTU_COMMON_DIR/install_docker.sh
