@@ -36,10 +36,10 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # $UBUNTU_COMMON_DIR/install_lustre_client.sh
 
 # # install DOCA OFED
-$UBUNTU_COMMON_DIR/install_doca.sh
+# $UBUNTU_COMMON_DIR/install_doca.sh
 
 # # install PMIX
-# $UBUNTU_COMMON_DIR/install_pmix.sh
+$UBUNTU_COMMON_DIR/install_pmix.sh
 
 # # install mpi libraries
 # $UBUNTU_COMMON_DIR/install_mpis.sh
