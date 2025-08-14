@@ -107,10 +107,10 @@ source ./set_properties.sh
 # $UBUNTU_COMMON_DIR/disable_auto_upgrade.sh
 
 # # Disable Predictive Network interface renaming
-$UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
+# $UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
 
 # # SKU Customization
-# $COMMON_DIR/setup_sku_customizations.sh
+$COMMON_DIR/setup_sku_customizations.sh
 
 # if [ "$GPU" = "AMD" ]; then
 #     #install rocm software stack
