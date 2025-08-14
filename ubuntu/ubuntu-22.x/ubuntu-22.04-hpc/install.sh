@@ -44,7 +44,7 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # # install mpi libraries
 # $UBUNTU_COMMON_DIR/install_mpis.sh
 
-if [ "$GPU" = "NVIDIA" ]; then
+# if [ "$GPU" = "NVIDIA" ]; then
     # install nvidia gpu driver
     # ./install_nvidiagpudriver.sh "$SKU"
     
@@ -53,7 +53,7 @@ if [ "$GPU" = "NVIDIA" ]; then
     
     # Install NVIDIA docker container
     # $UBUNTU_COMMON_DIR/install_docker.sh
-fi
+# fi
 
 # if [ "$GPU" = "AMD" ]; then
 #     # Set up docker
