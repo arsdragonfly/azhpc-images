@@ -46,13 +46,13 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 
 if [ "$GPU" = "NVIDIA" ]; then
     # install nvidia gpu driver
-    ./install_nvidiagpudriver.sh "$SKU"
+    # ./install_nvidiagpudriver.sh "$SKU"
     
-#     # Install NCCL
-#     $UBUNTU_COMMON_DIR/install_nccl.sh
+    # Install NCCL
+    $UBUNTU_COMMON_DIR/install_nccl.sh
     
-#     # Install NVIDIA docker container
-#     $UBUNTU_COMMON_DIR/install_docker.sh
+    # Install NVIDIA docker container
+    $UBUNTU_COMMON_DIR/install_docker.sh
 fi
 
 # if [ "$GPU" = "AMD" ]; then
