@@ -18,16 +18,16 @@ if [[ "$#" -gt 0 ]]; then
 fi
 
 # install pre-requisites
-./install_prerequisites.sh
+# ./install_prerequisites.sh
 
 # set properties
 source ./set_properties.sh
 
 # remove packages requiring Ubuntu Pro for security updates
-$UBUNTU_COMMON_DIR/remove_unused_packages.sh
+# $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 
 # install utils
-./install_utils.sh
+# ./install_utils.sh
 
 #update cmake
 # $UBUNTU_COMMON_DIR/install_cmake.sh
@@ -86,13 +86,13 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # $UBUNTU_COMMON_DIR/hpc-tuning.sh
 
 # # Install AZNFS Mount Helper
-$COMMON_DIR/install_aznfs.sh
+# $COMMON_DIR/install_aznfs.sh
 
 # # copy test file
-# $COMMON_DIR/copy_test_file.sh
+$COMMON_DIR/copy_test_file.sh
 
 # # install monitor tools
-# $COMMON_DIR/install_monitoring_tools.sh
+$COMMON_DIR/install_monitoring_tools.sh
 
 # # install AMD libs
 # $COMMON_DIR/install_amd_libs.sh
