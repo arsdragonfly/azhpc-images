@@ -83,10 +83,10 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 # $COMMON_DIR/install_azure_persistent_rdma_naming.sh
 
 # # optimizations
-$UBUNTU_COMMON_DIR/hpc-tuning.sh
+# $UBUNTU_COMMON_DIR/hpc-tuning.sh
 
 # # Install AZNFS Mount Helper
-# $COMMON_DIR/install_aznfs.sh
+$COMMON_DIR/install_aznfs.sh
 
 # # copy test file
 # $COMMON_DIR/copy_test_file.sh
