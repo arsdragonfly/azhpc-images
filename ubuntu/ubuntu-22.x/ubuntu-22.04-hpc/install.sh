@@ -85,8 +85,8 @@ source ./set_properties.sh
 # # optimizations
 # $UBUNTU_COMMON_DIR/hpc-tuning.sh
 
-# # Install AZNFS Mount Helper
-# $COMMON_DIR/install_aznfs.sh
+# Install AZNFS Mount Helper
+$COMMON_DIR/install_aznfs.sh
 
 # # copy test file
 # $COMMON_DIR/copy_test_file.sh
@@ -110,7 +110,7 @@ source ./set_properties.sh
 # $UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
 
 # # SKU Customization
-$COMMON_DIR/setup_sku_customizations.sh
+# $COMMON_DIR/setup_sku_customizations.sh
 
 # if [ "$GPU" = "AMD" ]; then
 #     #install rocm software stack
