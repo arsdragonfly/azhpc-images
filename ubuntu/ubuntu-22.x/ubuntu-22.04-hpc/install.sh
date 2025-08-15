@@ -73,55 +73,55 @@ source ./set_properties.sh
 #     $UBUNTU_COMMON_DIR/install_dcgm.sh
 # fi
 
-# # install Intel libraries
-# $COMMON_DIR/install_intel_libs.sh
+# install Intel libraries
+$COMMON_DIR/install_intel_libs.sh
 
-# # install diagnostic script
-# $COMMON_DIR/install_hpcdiag.sh
+# install diagnostic script
+$COMMON_DIR/install_hpcdiag.sh
 
-# # install persistent rdma naming
-# $COMMON_DIR/install_azure_persistent_rdma_naming.sh
+# install persistent rdma naming
+$COMMON_DIR/install_azure_persistent_rdma_naming.sh
 
 # # optimizations
-$UBUNTU_COMMON_DIR/hpc-tuning.sh
+# $UBUNTU_COMMON_DIR/hpc-tuning.sh
 
 # Install AZNFS Mount Helper
 # $COMMON_DIR/install_aznfs.sh
 
-# # copy test file
-# $COMMON_DIR/copy_test_file.sh
+# copy test file
+$COMMON_DIR/copy_test_file.sh
 
-# # install monitor tools
-# $COMMON_DIR/install_monitoring_tools.sh
+# install monitor tools
+$COMMON_DIR/install_monitoring_tools.sh
 
-# # install AMD libs
-# $COMMON_DIR/install_amd_libs.sh
+# install AMD libs
+$COMMON_DIR/install_amd_libs.sh
 
-# # install Azure/NHC Health Checks
-# $COMMON_DIR/install_health_checks.sh "$GPU"
+# install Azure/NHC Health Checks
+$COMMON_DIR/install_health_checks.sh "$GPU"
 
-# # disable cloud-init
-# $UBUNTU_COMMON_DIR/disable_cloudinit.sh
+# disable cloud-init
+$UBUNTU_COMMON_DIR/disable_cloudinit.sh
 
-# # diable auto kernel updates
-# $UBUNTU_COMMON_DIR/disable_auto_upgrade.sh
+# diable auto kernel updates
+$UBUNTU_COMMON_DIR/disable_auto_upgrade.sh
 
-# # Disable Predictive Network interface renaming
-# $UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
+# Disable Predictive Network interface renaming
+$UBUNTU_COMMON_DIR/disable_predictive_interface_renaming.sh
 
-# # SKU Customization
-# $COMMON_DIR/setup_sku_customizations.sh
+# SKU Customization
+$COMMON_DIR/setup_sku_customizations.sh
 
-# if [ "$GPU" = "AMD" ]; then
-#     #install rocm software stack
-#     ./install_rocm.sh    
-#     #install rccl and rccl-tests
-#     ./install_rccl.sh
-# fi
+if [ "$GPU" = "AMD" ]; then
+    #install rocm software stack
+    ./install_rocm.sh    
+    #install rccl and rccl-tests
+    ./install_rccl.sh
+fi
 
-# # clear history
-# # Uncomment the line below if you are running this on a VM
-# # $COMMON_DIR/clear_history.sh
+# clear history
+# Uncomment the line below if you are running this on a VM
+# $COMMON_DIR/clear_history.sh
 
 # # scan vulnerabilities using Trivy
 # $COMMON_DIR/trivy_scan.sh
