@@ -74,31 +74,31 @@ if [ "$GPU" = "NVIDIA" ]; then
 fi
 
 # install Intel libraries
-# $COMMON_DIR/install_intel_libs.sh
+$COMMON_DIR/install_intel_libs.sh
 
 # install diagnostic script
-# $COMMON_DIR/install_hpcdiag.sh
+$COMMON_DIR/install_hpcdiag.sh
 
 # install persistent rdma naming
-# $COMMON_DIR/install_azure_persistent_rdma_naming.sh
+$COMMON_DIR/install_azure_persistent_rdma_naming.sh
 
 # optimizations
-# $UBUNTU_COMMON_DIR/hpc-tuning.sh
+$UBUNTU_COMMON_DIR/hpc-tuning.sh
 
 # Install AZNFS Mount Helper
-# $COMMON_DIR/install_aznfs.sh
+$COMMON_DIR/install_aznfs.sh
 
 # copy test file
-# $COMMON_DIR/copy_test_file.sh
+$COMMON_DIR/copy_test_file.sh
 
 # install monitor tools
-# $COMMON_DIR/install_monitoring_tools.sh
+$COMMON_DIR/install_monitoring_tools.sh
 
 # install AMD libs
-# $COMMON_DIR/install_amd_libs.sh
+$COMMON_DIR/install_amd_libs.sh
 
 # install Azure/NHC Health Checks
-# $COMMON_DIR/install_health_checks.sh "$GPU"
+$COMMON_DIR/install_health_checks.sh "$GPU"
 
 # disable cloud-init
 # $UBUNTU_COMMON_DIR/disable_cloudinit.sh
