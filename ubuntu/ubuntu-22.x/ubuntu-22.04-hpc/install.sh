@@ -33,7 +33,7 @@ $UBUNTU_COMMON_DIR/remove_unused_packages.sh
 $UBUNTU_COMMON_DIR/install_cmake.sh
 
 # install Lustre client
-$UBUNTU_COMMON_DIR/install_lustre_client.sh
+# $UBUNTU_COMMON_DIR/install_lustre_client.sh
 
 # install DOCA OFED
 $UBUNTU_COMMON_DIR/install_doca.sh
