@@ -58,8 +58,8 @@
         },
         "ubuntu22.04": {
             "version": "2.21.3",
-            "sha256": "58949c1b169192a7f94840042c36398fef1d8f7206a64a975bda621607c1b5c5",
-            "url": "https://content.mellanox.com/hpc/hpc-x/v2.21.3/hpcx-v2.21.3-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz"
+            "sha256": "37dd98a54a7f1ba9a254583fed8a6ac048c3329709437bc388b4f124c8a583d3",
+            "url": "https://content.mellanox.com/hpc/hpc-x/v2.23/hpcx-v2.23-gcc-doca_ofed-ubuntu22.04-cuda12-x86_64.tbz"
         },
         "almalinux8.7": {
             "version": "2.18",
