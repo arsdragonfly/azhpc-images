@@ -56,7 +56,20 @@ write_component_version "OFED" $OFED_VERSION
 # Create systemd drop-in configuration for openibd.service
 # This adds restart on failure and ensures it starts after udev settles
 mkdir -p /etc/systemd/system/openibd.service.d
-cat > /etc/systemd/system/openibd.service.d/override.conf <<EOF
+
+if [[ $DISTRIBUTION == *"ubuntu22.04"* ]]; then
+    cat > /etc/systemd/system/openibd.service.d/override.conf <<EOF
+[Unit]
+After=systemd-udevd.service systemd-udev-trigger.service local-fs.target
+Requires=systemd-udevd.service
+
+[Service]
+Restart=on-failure
+RestartSec=5
+ExecStartPre=/usr/bin/udevadm settle --timeout=300
+EOF
+else
+    cat > /etc/systemd/system/openibd.service.d/override.conf <<EOF
 [Unit]
 After=systemd-udev-settle.service
 Wants=systemd-udev-settle.service
@@ -65,6 +78,7 @@ Wants=systemd-udev-settle.service
 Restart=on-failure
 RestartSec=5
 EOF
+fi
 
 systemctl daemon-reload
 systemctl enable openibd
