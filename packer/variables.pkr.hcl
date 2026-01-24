@@ -68,7 +68,20 @@ locals {
   gpu_size_option = coalesce(var.gpu_size_option, "Standard_ND96asr_v4")
 }
 
-# TODO: derive gpu_platform, gpu_sku and architecture from gpu_size_option
+locals {
+  gpu_sku = (
+    local.gpu_size_option == "Standard_ND40rs_v2" ? "V100" :
+    local.gpu_size_option == "Standard_ND96isr_MI300X_v5" ? "MI300X" :
+    local.gpu_size_option == "Standard_ND128isr_NDR_GB200_v6" ? "GB200" :
+    "A100"
+  )
+}
+
+locals {
+  gpu_platform = (
+    local.gpu_sku == "MI300X" ? "AMD" : "NVIDIA"
+  )
+}
 
 variable "create_image" {
   type        = string
@@ -189,7 +202,17 @@ locals {
   vhd_container_name = coalesce(var.vhd_container_name, "azhpc-vhd-store")
 }
 
-# TODO: determine VHD name prefix
+locals {
+  vhd_platform_suffix = local.gpu_platform == "AMD" ? "-ROCm" : ""
+  vhd_name_prefix = (
+    local.os_version == "ubuntu_24.04" ? "Ubuntu-HPC-24.04${local.vhd_platform_suffix}_gen2-${local.image_version}" :
+    local.os_version == "ubuntu_22.04" ? "Ubuntu-HPC-22.04${local.vhd_platform_suffix}_gen2-${local.image_version}" :
+    local.os_version == "alma8.10" ? "AlmaLinux-HPC-8.10${local.vhd_platform_suffix}_gen2-${local.image_version}" :
+    local.os_version == "alma9.6" ? "AlmaLinux-HPC-9.6${local.vhd_platform_suffix}_gen2-${local.image_version}" :
+    local.os_version == "azurelinux3.0" ? "AzureLinux-HPC-3.0${local.vhd_platform_suffix}_gen2-${local.image_version}" :
+    "Unknown-HPC${local.vhd_platform_suffix}_gen2-${local.image_version}"
+  )
+}
 
 variable "skip_hpc" {
   type       = string
@@ -266,11 +289,6 @@ locals {
 
 # TODO: add injection point for 1P-specific scripts
 
-
-# =============================================================================
-# Azure Linux Specific Variables
-# =============================================================================
-
 variable "base_image" {
   type        = string
   description = "base image type: Marketplace-FIPS, Marketplace-Non-FIPS, 1P-FIPS, 1P-Non-FIPS"
@@ -307,9 +325,36 @@ variable "u24gb200_internalbits_version" {
   default     = env("U24GB200_INTERNALBITS_VERSION")
 }
 
-# TODO: TiP session stuff
+variable "extra_tags" {
+  type        = map(string)
+  description = "Additional tags to apply to all Azure resources created during the build. Useful for cost tracking, compliance, or custom metadata."
+  default     = {}
+}
 
-# TODO: PartUUID
+# TiP (Test in Production) session - convenience variable for GB-Family SKUs
+# If provided, adds 'TipNode.SessionId' tag to target specific hardware rack
+variable "tip_session_id" {
+  type        = string
+  description = "TiP Session ID for GB-Family SKUs. Specify 'None' or leave empty for non-GB-Family SKUs."
+  default     = env("TIP_SESSION_ID")
+}
+locals {
+  tip_session_id = coalesce(var.tip_session_id, "None")
+  # Merge user-provided extra_tags with TiP tag if specified
+  merged_extra_tags = merge(
+    var.extra_tags,
+    local.tip_session_id != "None" ? { "TipNode.SessionId" = local.tip_session_id } : {}
+  )
+}
+
+variable "partuuid" {
+  type        = string
+  description = "Disk PartUUID for GB200 EFI partition. Required for VMSS image updates on GB200 to avoid boot failures due to NVRAM PARTUUID mismatch. Specify 'None' for non-GB-Family SKUs."
+  default     = env("PARTUUID")
+}
+locals {
+  partuuid = coalesce(var.partuuid, "None")
+}
 
 variable "major_version" {
   type        = string
