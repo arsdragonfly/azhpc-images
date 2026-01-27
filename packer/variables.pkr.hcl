@@ -83,6 +83,15 @@ locals {
   )
 }
 
+variable "architecture" {
+  type        = string
+  description = "CPU architecture for the image"
+  default     = null
+}
+locals {
+  architecture = coalesce(var.architecture, local.gpu_size_option == "Standard_ND128isr_NDR_GB200_v6" ? "aarch64" : "x86_64")
+}
+
 variable "create_image" {
   type        = string
   description = "whether to create a compute gallery image or not"
@@ -289,13 +298,93 @@ locals {
 
 # TODO: add injection point for 1P-specific scripts
 
+# TODO: allow building from custom SIG or community gallery
 variable "base_image" {
   type        = string
   description = "base image type: Marketplace-FIPS, Marketplace-Non-FIPS, 1P-FIPS, 1P-Non-FIPS"
   default     = env("BASE_IMAGE")
 }
+variable "image_publisher" {
+  type        = string
+  description = "Custom base image publisher"
+  default     = null
+}
+variable "image_offer" {
+  type        = string
+  description = "Custom base image offer"
+  default     = null
+}
+variable "image_sku" {
+  type        = string
+  description = "Custom base image SKU"
+  default     = null
+}
+variable "direct_shared_gallery_image_id" {
+  type        = string
+  description = "Direct Shared Gallery Image ID for 1P images"
+  default     = null
+}
 locals {
   base_image = coalesce(var.base_image, "Marketplace")
+
+  # derived locals for base image
+  need_direct_shared_gallery = (local.base_image == "1P-FIPS" || local.base_image == "1P-Non-FIPS") ? true : false
+  os_base_image_kind = (local.os_version == "azurelinux3.0") ? "${local.os_version}-${local.base_image}" : "${local.os_version}"
+  builtin_marketplace_base_image_details = {
+    "aarch64" = {
+      "ubuntu_24.04" = {
+        "image_publisher" = "Canonical",
+        "image_offer" = "ubuntu-24_04-lts",
+        "image_sku" = "server-arm64"
+      }
+    },
+    "x86_64" = {
+      "ubuntu_24.04" = {
+        "image_publisher" = "Canonical",
+        "image_offer" = "ubuntu-24_04-lts",
+        "image_sku" = "server"
+      },
+      "ubuntu_22.04" = {
+        "image_publisher" = "Canonical",
+        "image_offer" = "0001-com-ubuntu-server-jammy",
+        "image_sku" = "22_04-lts-gen2"
+      },
+      "alma8.10" = {
+        "image_publisher" = "almalinux",
+        "image_offer"     = "almalinux-x86_64",
+        "image_sku"       = "8-gen2"
+      },
+      "alma9.7" = {
+        "image_publisher" = "almalinux",
+        "image_offer"     = "almalinux-x86_64",
+        "image_sku"       = "9-gen2"
+      },
+      "azurelinux3.0-Marketplace-Non-FIPS" = {
+        "image_publisher" = "MicrosoftCBLMariner",
+        "image_offer"     = "azure-linux-3",
+        "image_sku"       = "azure-linux-3-gen2"
+      },
+      "azurelinux3.0-Marketplace-FIPS" = {
+        "image_publisher" = "MicrosoftCBLMariner",
+        "image_offer"     = "azure-linux-3",
+        "image_sku"       = "azure-linux-3-gen2-fips"
+      }
+    }
+  }
+  # these images are only accessible by 1P
+  builtin_direct_shared_gallery_base_image_details = {
+    "x86_64" = {
+      "azurelinux3.0-1P-Non-FIPS" = "/sharedGalleries/CblMariner.1P/images/azure-linux-3-gen2/versions/latest",
+      "azurelinux3.0-1P-FIPS" =  "/sharedGalleries/CblMariner.1P/images/azure-linux-3-gen2-fips/versions/latest"
+    }
+  }
+
+  use_non_marketplace_base_image = local.need_direct_shared_gallery || var.direct_shared_gallery_image_id != null
+  marketplace_base_image_detail = (local.use_non_marketplace_base_image) ? {} : local.builtin_marketplace_base_image_details[local.architecture][local.os_base_image_kind]
+  image_publisher = coalesce(var.image_publisher, lookup(local.marketplace_base_image_detail, "image_publisher", null))
+  image_offer = coalesce(var.image_offer, lookup(local.marketplace_base_image_detail, "image_offer", null))
+  image_sku = coalesce(var.image_sku, lookup(local.marketplace_base_image_detail, "image_sku", null))
+  direct_shared_gallery_image_id = coalesce(var.direct_shared_gallery_image_id, lookup(lookup(local.builtin_direct_shared_gallery_base_image_details, local.architecture, {}), local.os_base_image_kind, null))
 }
 
 variable "azl3_prebuilt_version" {
