@@ -26,12 +26,6 @@ locals {
   resource_grp_location = coalesce(var.resource_grp_location, "southcentralus")
 }
 
-variable "owner_alias" {
-  type        = string
-  description = "Your alias for Azure resource tagging (required by policy)"
-  default     = "mogaurab"
-}
-
 variable "images_repo_url" {
   type        = string
   description = "GitHub repository URL for azhpc-images"
@@ -181,7 +175,7 @@ variable "sig_target_regions" {
 }
 
 locals {
-  sig_target_regions = var.sig_target_regions == null ? [local.resource_grp_location] : split(" ", var.sig_target_regions)
+  sig_target_regions = var.sig_target_regions == "" ? [local.resource_grp_location] : split(" ", var.sig_target_regions)
 }
 
 variable "vhd_resource_grp_name" {
@@ -379,12 +373,12 @@ locals {
     }
   }
 
-  use_non_marketplace_base_image = local.need_direct_shared_gallery || var.direct_shared_gallery_image_id != null
+  use_non_marketplace_base_image = local.need_direct_shared_gallery || var.direct_shared_gallery_image_id != ""
   marketplace_base_image_detail = (local.use_non_marketplace_base_image) ? {} : local.builtin_marketplace_base_image_details[local.architecture][local.os_base_image_kind]
-  image_publisher = coalesce(var.image_publisher, lookup(local.marketplace_base_image_detail, "image_publisher", null))
-  image_offer = coalesce(var.image_offer, lookup(local.marketplace_base_image_detail, "image_offer", null))
-  image_sku = coalesce(var.image_sku, lookup(local.marketplace_base_image_detail, "image_sku", null))
-  direct_shared_gallery_image_id = coalesce(var.direct_shared_gallery_image_id, lookup(lookup(local.builtin_direct_shared_gallery_base_image_details, local.architecture, {}), local.os_base_image_kind, null))
+  image_publisher = try(coalesce(var.image_publisher, lookup(local.marketplace_base_image_detail, "image_publisher", null)), null)
+  image_offer = try(coalesce(var.image_offer, lookup(local.marketplace_base_image_detail, "image_offer", null)), null)
+  image_sku = try(coalesce(var.image_sku, lookup(local.marketplace_base_image_detail, "image_sku", null)), null)
+  direct_shared_gallery_image_id = try(coalesce(var.direct_shared_gallery_image_id, lookup(lookup(local.builtin_direct_shared_gallery_base_image_details, local.architecture, {}), local.os_base_image_kind, null)), null)
 }
 
 variable "azl3_prebuilt_version" {
@@ -548,9 +542,16 @@ variable "owner_tag" {
 }
 
 locals {
-  owner_tag = coalesce(
+  owner_tag = try(coalesce(
     var.owner_tag,
     var.build_requestedforemail,
     var.build_requestedfor
-  )
+  ), null)
+}
+
+# 1P-specific stuff
+variable "tip_session_id" {
+  type        = string
+  description = "TiP Session ID for GB-Family SKUs."
+  default     = env("TIP_SESSION_ID")
 }

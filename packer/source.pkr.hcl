@@ -48,4 +48,37 @@ source "azure-arm" "hpc" {
   ssh_timeout            = "30m"
   ssh_handshake_attempts = 100
   ssh_pty                = true
+
+  azure_tags {
+    name  = "OptOutOfBakedInExtensions" # 1P-specific stuff
+    value = ""
+  }
+
+  azure_tags {
+    name  = "SkipASMAzSecPack"
+    value = "true"
+  }
+
+  dynamic "azure_tags" {
+    for_each = (local.owner_tag == "" || local.owner_tag == null) ? [] : [1]
+    content {
+      name  = "Owner"
+      value = local.owner_tag
+  }
+
+  dynamic "azure_tags" {
+    for_each = (var.build_buildid == "" || var.build_buildid == null) ? [] : [1]
+    content {
+      name  = "BuildId"
+      value = var.build_buildid
+  }
+
+  dynamic "azure_tags" {
+    for_each = (var.tip_session_id == "" || var.tip_session_id == null || var.tip_session_id == "None") ? [] : [1]
+    content {
+      name  = "TipNode.SessionId"
+      value = var.tip_session_id
+  }
+
+  # TODO: handle 1P-specific public IP tagging by backfilling as opposed to tagging upfront
 }
