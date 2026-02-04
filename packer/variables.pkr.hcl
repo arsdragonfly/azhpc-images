@@ -516,3 +516,41 @@ variable "use_spot_instances" {
 locals {
   use_spot_instances = coalesce(var.use_spot_instances, false)
 }
+
+# these variables facilitate Azure resource tagging to satisfy 1P-specific policies
+# with defaults that make sense in an Azure DevOps setting, but can be skipped altogether or
+# overridden for other CI/CD systems or local builds
+
+# Azure DevOps-specific variables
+variable "build_requestedforemail" {
+  type        = string
+  description = "Email of the user who requested the build. Auto-populated in environment by Azure DevOps."
+  default     = env("BUILD_REQUESTEDFOREMAIL")
+}
+
+variable "build_requestedfor" {
+  type        = string
+  description = "Alias of the user who requested the build. Auto-populated in environment by Azure DevOps."
+  default     = env("BUILD_REQUESTEDFOR")
+}
+
+variable "build_buildid" {
+  type        = string
+  description = "Build ID of the current build. Auto-populated in environment by Azure DevOps."
+  default     = env("BUILD_BUILDID")
+}
+
+# set this explicitly if you want to have an explicit Owner tag
+variable "owner_tag" {
+  type        = string
+  description = "Value to use for the 'Owner' tag on Azure resources."
+  default     = null
+}
+
+locals {
+  owner_tag = coalesce(
+    var.owner_tag,
+    var.build_requestedforemail,
+    var.build_requestedfor
+  )
+}
