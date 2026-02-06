@@ -246,7 +246,7 @@ locals {
 
 variable "retain_vm_always" {
   type        = string
-  description = "Retain the VM (and the resource group) unconditionally. Injects an error to Packer to prevent deletion."
+  description = "Retain the VM (and the resource group) unconditionally. Injects an error to Packer to prevent deprovisioning/deletion, giving you access to the underlying VM for debugging purposes."
   default     = env("RETAIN_VM_ALWAYS")
 }
 locals {
@@ -373,12 +373,12 @@ locals {
     }
   }
 
-  use_non_marketplace_base_image = local.need_direct_shared_gallery || var.direct_shared_gallery_image_id != ""
+  use_non_marketplace_base_image = local.need_direct_shared_gallery || (var.direct_shared_gallery_image_id != null && var.direct_shared_gallery_image_id != "")
   marketplace_base_image_detail = (local.use_non_marketplace_base_image) ? {} : local.builtin_marketplace_base_image_details[local.architecture][local.os_base_image_kind]
-  image_publisher = try(coalesce(var.image_publisher, lookup(local.marketplace_base_image_detail, "image_publisher", null)), null)
-  image_offer = try(coalesce(var.image_offer, lookup(local.marketplace_base_image_detail, "image_offer", null)), null)
-  image_sku = try(coalesce(var.image_sku, lookup(local.marketplace_base_image_detail, "image_sku", null)), null)
-  direct_shared_gallery_image_id = try(coalesce(var.direct_shared_gallery_image_id, lookup(lookup(local.builtin_direct_shared_gallery_base_image_details, local.architecture, {}), local.os_base_image_kind, null)), null)
+  image_publisher = try(coalesce(var.image_publisher, local.marketplace_base_image_detail["image_publisher"]), null)
+  image_offer = try(coalesce(var.image_offer, local.marketplace_base_image_detail["image_offer"]), null)
+  image_sku = try(coalesce(var.image_sku, local.marketplace_base_image_detail["image_sku"]), null)
+  direct_shared_gallery_image_id = try(coalesce(var.direct_shared_gallery_image_id, local.builtin_direct_shared_gallery_base_image_details[local.architecture][local.os_base_image_kind]), null)
 }
 
 variable "azl3_prebuilt_version" {
@@ -406,28 +406,6 @@ variable "u24gb200_internalbits_version" {
   type        = string
   description = "Version for Ubuntu 24.04 GB200 internal bits"
   default     = env("U24GB200_INTERNALBITS_VERSION")
-}
-
-variable "extra_tags" {
-  type        = map(string)
-  description = "Additional tags to apply to all Azure resources created during the build. Useful for cost tracking, compliance, or custom metadata."
-  default     = {}
-}
-
-# TiP (Test in Production) session - convenience variable for GB-Family SKUs
-# If provided, adds 'TipNode.SessionId' tag to target specific hardware rack
-variable "tip_session_id" {
-  type        = string
-  description = "TiP Session ID for GB-Family SKUs. Specify 'None' or leave empty for non-GB-Family SKUs."
-  default     = env("TIP_SESSION_ID")
-}
-locals {
-  tip_session_id = coalesce(var.tip_session_id, "None")
-  # Merge user-provided extra_tags with TiP tag if specified
-  merged_extra_tags = merge(
-    var.extra_tags,
-    local.tip_session_id != "None" ? { "TipNode.SessionId" = local.tip_session_id } : {}
-  )
 }
 
 variable "partuuid" {
@@ -485,30 +463,30 @@ locals {
 }
 
 variable "aks_host_image" {
-  type        = bool
+  type        = string
   description = "Whether to produce an AKS host image"
   default     = env("AKS_HOST_IMAGE")
 }
 locals {
-  aks_host_image = coalesce(var.aks_host_image, false)
+  aks_host_image = lower(coalesce(var.aks_host_image, "false")) == "true" ? true : false
 }
 
 variable "accl_nw" {
-  type        = bool
+  type        = string
   description = "Whether to enable Acccelerated Networking on the build VM"
   default     = env("ACCL_NW")
 }
 locals {
-  accl_nw = coalesce(var.accl_nw, false)
+  accl_nw = lower(coalesce(var.accl_nw, "false")) == "true" ? true : false
 }
 
 variable "use_spot_instances" {
-  type        = bool
+  type        = string
   description = "Whether to use Spot Instances for the build VM"
   default     = env("USE_SPOT_INSTANCES")
 }
 locals {
-  use_spot_instances = coalesce(var.use_spot_instances, false)
+  use_spot_instances = lower(coalesce(var.use_spot_instances, "false")) == "true" ? true : false
 }
 
 # these variables facilitate Azure resource tagging to satisfy 1P-specific policies
@@ -549,9 +527,52 @@ locals {
   ), null)
 }
 
-# 1P-specific stuff
+# TiP (Test in Production) session - convenience variable for GB-Family SKUs
+# If provided, adds 'TipNode.SessionId' tag to target specific hardware rack
 variable "tip_session_id" {
   type        = string
-  description = "TiP Session ID for GB-Family SKUs."
+  description = "TiP Session ID for GB-Family SKUs. Specify 'None' or leave empty for non-GB-Family SKUs."
   default     = env("TIP_SESSION_ID")
+}
+locals {
+  tip_session_id = coalesce(var.tip_session_id, "None")
+}
+
+variable "extra_tags" {
+  type        = map(string)
+  description = "Additional tags to apply to all Azure resources created during the build. Useful for cost tracking, compliance, or custom metadata."
+  default     = {}
+}
+
+locals {
+  # Merge user-provided extra_tags with TiP tag if specified
+  merged_extra_tags = merge(
+    var.extra_tags,
+    local.tip_session_id != "None" ? { "TipNode.SessionId" = local.tip_session_id } : {},
+    local.owner_tag != null ? { "Owner" = local.owner_tag } : {}
+  )
+  merged_extra_tags_string = join(" ", [for k, v in local.merged_extra_tags : "${k}=${v}"])
+}
+
+
+variable "azhpc_local_path" {
+  type        = string
+  description = "Path to the azhpc-images directory (to be copied to the build VM)"
+  default     = ".."
+}
+locals {
+  azhpc_local_path = abspath(var.azhpc_local_path)
+}
+
+variable "azhpc_path" {
+  type        = string
+  description = "Destination path on the build VM for the azhpc-images directory"
+  default     = null
+}
+locals {
+  azhpc_path = coalesce(var.azhpc_path, "/home/${local.username}/azhpc-images")
+}
+
+locals {
+  inline_shebang = "/bin/bash -e"
 }
