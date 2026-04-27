@@ -19,7 +19,24 @@ if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     if [ "$SKU" = "GB200" ]; then
         apt-mark hold linux-azure-nvidia
     else
-        apt-mark hold linux-azure-${KERNEL_VERSION:-6.8}
+        # Choose a per-distro fallback kernel meta-package when KERNEL_VERSION is not set.
+        UBUNTU_VERSION_ID=$(. /etc/os-release; echo "$VERSION_ID")
+        case "${UBUNTU_VERSION_ID}" in
+            22.04) DEFAULT_KERNEL_VERSION="5.15" ;;
+            24.04) DEFAULT_KERNEL_VERSION="6.8"  ;;
+            26.04) DEFAULT_KERNEL_VERSION="6.17" ;;
+            *)     DEFAULT_KERNEL_VERSION="6.8"  ;;
+        esac
+        TARGET_KERNEL_PKG="linux-azure-${KERNEL_VERSION:-$DEFAULT_KERNEL_VERSION}"
+        if apt-cache show "${TARGET_KERNEL_PKG}" >/dev/null 2>&1; then
+            apt-mark hold "${TARGET_KERNEL_PKG}"
+        elif dpkg -l linux-azure 2>/dev/null | grep -q '^ii'; then
+            # Fallback: hold the unversioned linux-azure meta-package if installed.
+            echo "##[warning]${TARGET_KERNEL_PKG} not available; holding linux-azure instead"
+            apt-mark hold linux-azure
+        else
+            echo "##[warning]No suitable linux-azure kernel package found to hold; continuing"
+        fi
     fi
     # upgrade pre-installed components
     apt update

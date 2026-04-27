@@ -206,6 +206,34 @@ install_ubuntu_lts_kernel() {
             update-grub
             ;;
             
+        26.04)
+            apt update
+
+            local kernel_ver="${KERNEL_VERSION:-6.17}"
+            echo "##[section]Installing kernel ${kernel_ver} for Ubuntu 26.04 (best-effort)"
+
+            # Best-effort: try to install the versioned linux-azure meta-package, otherwise
+            # fall back to whatever the marketplace image ships with so the build can proceed.
+            if apt-cache show linux-azure-${kernel_ver} &>/dev/null; then
+                apt install -y linux-azure-${kernel_ver}
+                apt-mark hold linux-azure-${kernel_ver}
+                if apt-cache show linux-modules-extra-azure-${kernel_ver} &>/dev/null; then
+                    apt install -y linux-modules-extra-azure-${kernel_ver}
+                fi
+            elif apt-cache show linux-azure &>/dev/null; then
+                echo "##[warning]linux-azure-${kernel_ver} not yet published for 26.04; falling back to linux-azure"
+                apt install -y linux-azure
+                apt-mark hold linux-azure
+            else
+                echo "##[warning]No linux-azure kernel package available for 26.04; using stock kernel"
+            fi
+
+            apt autoremove -y || true
+            apt upgrade -y || true
+
+            update-grub || true
+            ;;
+
         22.04)
             apt update
             apt install -y linux-azure-lts-22.04
