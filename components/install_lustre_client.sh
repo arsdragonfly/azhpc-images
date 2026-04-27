@@ -14,12 +14,19 @@ if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
         SIGNED_BY="/usr/share/keyrings/microsoft-prod.gpg"
     elif [ $UBUNTU_VERSION == 22.04 ]; then
         SIGNED_BY="/etc/apt/trusted.gpg.d/microsoft-prod.gpg"
+    elif [ $UBUNTU_VERSION == 26.04 ]; then
+        SIGNED_BY="/usr/share/keyrings/microsoft-prod.gpg"
     fi
     echo "deb [arch=$ARCHITECTURE_DISTRO signed-by=$SIGNED_BY] https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/ ${DISTRIB_CODENAME} main" | tee /etc/apt/sources.list.d/amlfs.list
     # Enable these lines if the MS PMC repo was not already setup.
     #curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
     #cp ./microsoft.gpg /etc/apt/trusted.gpg.d/
-    apt-get update
+    if ! apt-get update; then
+        echo "##[warning]apt-get update failed (likely amlfs-${DISTRIB_CODENAME} repo not yet published); skipping Lustre installation"
+        rm -f /etc/apt/sources.list.d/amlfs.list
+        apt-get update || true
+        exit 0
+    fi
 
     CURRENT_KERNEL=$(uname -r)
     # Extract kernel minor version (e.g., "6.8" from "6.8.0-1052-azure")

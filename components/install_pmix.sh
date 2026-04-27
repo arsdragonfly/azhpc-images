@@ -14,6 +14,11 @@ if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     elif [ $UBUNTU_VERSION == 22.04 ]; then
         REPO=slurm-ubuntu-jammy
         SIGNED_BY="/etc/apt/trusted.gpg.d/microsoft-prod.gpg"
+    elif [ $UBUNTU_VERSION == 26.04 ]; then
+        # Best-effort for Ubuntu 26.04 (Resolute Raccoon): try the resolute slurm repo,
+        # fall back to noble if not yet published.
+        REPO=slurm-ubuntu-resolute
+        SIGNED_BY="/usr/share/keyrings/microsoft-prod.gpg"
     else echo "$DISTRIBUTION not supported for pmix installation."
     fi
     echo "deb [arch=$ARCHITECTURE_DISTRO signed-by=$SIGNED_BY] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
@@ -22,15 +27,31 @@ if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     ## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
     ## use generic ubuntu marketplace image then this package sets up the right gpg keys for PMC.
     if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
-        curl -sSL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb
+        # Best-effort: if the PMC repo for $UBUNTU_VERSION isn't published yet, fall back to 24.04 (noble).
+        if curl -fsSL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb; then
+            :
+        else
+            echo "##[warning]packages-microsoft-prod for ubuntu/$UBUNTU_VERSION not available; falling back to ubuntu/24.04"
+            curl -sSL -O https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+        fi
         dpkg -i packages-microsoft-prod.deb
         rm packages-microsoft-prod.deb
     fi
-    apt update
-    apt install -y pmix=${PMIX_VERSION} libevent-dev libhwloc-dev # libmunge-dev
+
+    if ! apt update; then
+        echo "##[warning]apt update failed (likely $REPO not yet published for $UBUNTU_VERSION); retrying without slurm repo"
+        rm -f /etc/apt/sources.list.d/slurm.list
+        apt update
+    fi
+    if [ -f /etc/apt/sources.list.d/slurm.list ]; then
+        apt install -y pmix=${PMIX_VERSION} libevent-dev libhwloc-dev # libmunge-dev
+        apt-mark hold pmix=${PMIX_VERSION} libevent-dev libhwloc-dev # libmunge-dev
+    else
+        echo "##[warning]Skipping PMC slurm-repo pmix install for $UBUNTU_VERSION; using distro-shipped pmix instead"
+        apt install -y libpmix-dev libpmix2 libevent-dev libhwloc-dev || apt install -y libevent-dev libhwloc-dev
+    fi
     # Hold versions of packages to prevent accidental updates. Packages can still be upgraded explictly by
     # '--allow-change-held-packages' flag.
-    apt-mark hold pmix=${PMIX_VERSION} libevent-dev libhwloc-dev # libmunge-dev
 elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
     tdnf -y install pmix pmix-devel pmix-tools
     tdnf -y install hwloc-devel libevent-devel munge-devel
