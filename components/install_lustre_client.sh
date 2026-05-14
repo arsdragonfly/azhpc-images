@@ -68,10 +68,12 @@ else
         sed -i "$ s/$/ amlfs*/" /etc/dnf/dnf.conf
     elif sudo dnf list --available "amlfs-lustre-client-${LUSTRE_VERSION_UNDERSCORE}-${KERNEL_MINOR}.*" 2>/dev/null | grep -q "Available Packages"; then
         # Packages exist for this kernel minor version but not for the exact patch version.
-        echo "##[error]Lustre client packages exist for kernel ${KERNEL_MINOR}.x but not for the exact version ${CURRENT_KERNEL}."
-        echo "##[error]The AMLFS repo likely hasn't published a package for this kernel patch version yet."
+        # On RHEL-family builds, do not fail the build when an up-to-date Lustre package
+        # has not been published yet for the running kernel; skip Lustre installation instead.
+        echo "##[warning]Lustre client packages exist for kernel ${KERNEL_MINOR}.x but not for the exact version ${CURRENT_KERNEL}."
+        echo "##[warning]The AMLFS repo likely hasn't published a package for this kernel patch version yet. Skipping Lustre installation."
         sudo dnf list --available "amlfs-lustre-client-${LUSTRE_VERSION_UNDERSCORE}-${KERNEL_MINOR}.*" 2>/dev/null | tail -5
-        exit 1
+        exit 0
     else
         # No packages exist for this kernel minor version at all.
         echo "##[warning]No Lustre client packages available for kernel minor version ${KERNEL_MINOR}. Skipping Lustre installation."
