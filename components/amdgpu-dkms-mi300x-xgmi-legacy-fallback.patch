@@ -1,0 +1,194 @@
+diff -ruN a/amd/amdgpu/amdgpu.h b/amd/amdgpu/amdgpu.h
+--- a/amd/amdgpu/amdgpu.h	2026-04-21 16:10:46.000000000 +0000
++++ b/amd/amdgpu/amdgpu.h	2026-06-24 22:29:43.771301445 +0000
+@@ -275,6 +275,7 @@
+ extern int amdgpu_wbrf;
+ extern int amdgpu_user_queue;
+ extern int amdgpu_ptl;
++extern int amdgpu_sriov_xgmi_topology;
+ 
+ #define AMDGPU_VM_MAX_NUM_CTX			4096
+ #define AMDGPU_SG_THRESHOLD			(256*1024*1024)
+diff -ruN a/amd/amdgpu/amdgpu_drv.c b/amd/amdgpu/amdgpu_drv.c
+--- a/amd/amdgpu/amdgpu_drv.c	2026-04-21 16:10:46.000000000 +0000
++++ b/amd/amdgpu/amdgpu_drv.c	2026-06-24 22:29:43.771301445 +0000
+@@ -249,6 +249,7 @@
+ int amdgpu_rebar = -1; /* auto */
+ int amdgpu_user_queue = -1;
+ int amdgpu_ptl = -1; /* auto */
++int amdgpu_sriov_xgmi_topology = -1; /* auto */
+ 
+ DECLARE_DYNDBG_CLASSMAP(drm_debug_classes, DD_CLASS_TYPE_DISJOINT_BITS, 0,
+ 			"DRM_UT_CORE",
+@@ -1157,6 +1158,19 @@
+ MODULE_PARM_DESC(ptl, "Enable PTL (-1 = auto, 0 = disable (default), 1 = enable, 2 = permanently disable)");
+ module_param_named(ptl, amdgpu_ptl, int, 0444);
+ 
++/**
++ * DOC: sriov_xgmi_topology (int)
++ * Select SR-IOV XGMI peer-link topology discovery. The default auto mode uses
++ * the PF-advertised extended peer-link path when it returns usable link records
++ * and falls back to the legacy peer-link path otherwise.
++ *
++ * - -1 = auto
++ * -  0 = force legacy peer-link discovery
++ * -  1 = force extended peer-link discovery
++ */
++MODULE_PARM_DESC(sriov_xgmi_topology, "SR-IOV XGMI topology discovery (-1 = auto, 0 = legacy, 1 = extended)");
++module_param_named(sriov_xgmi_topology, amdgpu_sriov_xgmi_topology, int, 0444);
++
+ /* These devices are not supported by amdgpu.
+  * They are supported by the mach64, r128, radeon drivers
+  */
+diff -ruN a/amd/amdgpu/amdgpu_psp.c b/amd/amdgpu/amdgpu_psp.c
+--- a/amd/amdgpu/amdgpu_psp.c	2026-04-21 16:10:46.000000000 +0000
++++ b/amd/amdgpu/amdgpu_psp.c	2026-06-24 22:30:21.058757542 +0000
+@@ -1966,6 +1966,30 @@
+ 	amdgpu_put_xgmi_hive(hive);
+ }
+ 
++static bool psp_xgmi_extended_peer_links_valid(struct psp_xgmi_topology_info *topology,
++	struct ta_xgmi_cmd_get_extend_peer_link_info *link_info)
++{
++	bool has_link = false;
++	int i, j;
++
++	if (!topology || topology->num_nodes <= 1)
++		return true;
++
++	for (i = 0; i < topology->num_nodes; i++) {
++		uint8_t num_links = link_info->nodes[i].num_links;
++
++		if (num_links > TA_XGMI__MAX_PORT_NUM)
++			return false;
++
++		for (j = 0; j < num_links; j++)
++			if (link_info->nodes[i].port_num[j].src_xgmi_port_num ||
++			    link_info->nodes[i].port_num[j].dst_xgmi_port_num)
++				has_link = true;
++	}
++
++	return has_link;
++}
++
+ int psp_xgmi_get_topology_info(struct psp_context *psp,
+ 			       int number_devices,
+ 			       struct psp_xgmi_topology_info *topology,
+@@ -2020,6 +2044,8 @@
+ 
+ 	}
+ 
++	psp->xgmi_context.sriov_topology_legacy = false;
++
+ 	/* Invoke xgmi ta again to get the link information */
+ 	if (psp_xgmi_peer_link_info_supported(psp)) {
+ 		struct ta_xgmi_cmd_get_peer_link_info *link_info_output;
+@@ -2032,14 +2058,23 @@
+ 			amdgpu_ip_version(psp->adev, MP0_HWIP, 0) ==
+ 				IP_VERSION(13, 0, 14) ||
+ 			amdgpu_sriov_vf(psp->adev);
++		bool sriov_auto = amdgpu_sriov_vf(psp->adev) && amdgpu_sriov_xgmi_topology < 0;
+ 		bool ta_port_num_support = psp->xgmi_context.xgmi_ta_caps & EXTEND_PEER_LINK_INFO_CMD_FLAG ||
+ 			amdgpu_sriov_xgmi_ta_ext_peer_link_en(psp->adev);
+ 
++		if (amdgpu_sriov_vf(psp->adev)) {
++			if (amdgpu_sriov_xgmi_topology == 0)
++				ta_port_num_support = false;
++			else if (amdgpu_sriov_xgmi_topology > 0)
++				ta_port_num_support = true;
++		}
++
+ 		/* popluate the shared output buffer rather than the cmd input buffer
+ 		 * with node_ids as the input for GET_PEER_LINKS command execution.
+ 		 * This is required for GET_PEER_LINKS per xgmi ta implementation.
+ 		 * The same requirement for GET_EXTEND_PEER_LINKS command.
+ 		 */
++	retry_link_info:
+ 		if (ta_port_num_support) {
+ 			link_extend_info_output = &xgmi_cmd->xgmi_out_message.get_extend_link_info;
+ 
+@@ -2059,8 +2094,28 @@
+ 		}
+ 
+ 		ret = psp_xgmi_invoke(psp, xgmi_cmd->cmd_id);
+-		if (ret)
++		if (ret) {
++			if (sriov_auto && ta_port_num_support) {
++				dev_warn(psp->adev->dev,
++					"XGMI: extended peer links failed, falling back to legacy peer links\n");
++				ta_port_num_support = false;
++				psp->xgmi_context.sriov_topology_legacy = true;
++				goto retry_link_info;
++			}
+ 			return ret;
++		}
++
++		if (sriov_auto && ta_port_num_support &&
++		    !psp_xgmi_extended_peer_links_valid(topology, link_extend_info_output)) {
++			dev_warn(psp->adev->dev,
++				"XGMI: extended peer links look incomplete, falling back to legacy peer links\n");
++			ta_port_num_support = false;
++			psp->xgmi_context.sriov_topology_legacy = true;
++			goto retry_link_info;
++		}
++
++		if (amdgpu_sriov_vf(psp->adev) && !ta_port_num_support)
++			psp->xgmi_context.sriov_topology_legacy = true;
+ 
+ 		for (i = 0; i < topology->num_nodes; i++) {
+ 			uint8_t node_num_links = ta_port_num_support ?
+diff -ruN a/amd/amdgpu/amdgpu_psp.h b/amd/amdgpu/amdgpu_psp.h
+--- a/amd/amdgpu/amdgpu_psp.h	2026-04-21 16:10:46.000000000 +0000
++++ b/amd/amdgpu/amdgpu_psp.h	2026-06-24 22:29:43.771301445 +0000
+@@ -231,6 +231,7 @@
+ 	struct psp_xgmi_topology_info	top_info;
+ 	bool				supports_extended_data;
+ 	uint8_t				xgmi_ta_caps;
++	bool				sriov_topology_legacy;
+ };
+ 
+ struct psp_ras_context {
+diff -ruN a/amd/amdgpu/amdgpu_xgmi.c b/amd/amdgpu/amdgpu_xgmi.c
+--- a/amd/amdgpu/amdgpu_xgmi.c	2026-04-21 16:10:47.000000000 +0000
++++ b/amd/amdgpu/amdgpu_xgmi.c	2026-06-24 22:29:43.772301457 +0000
+@@ -974,6 +974,29 @@
+ 	return 0;
+ }
+ 
++static void amdgpu_xgmi_fill_topology_info(struct amdgpu_device *adev,
++	struct amdgpu_device *peer_adev)
++{
++	struct psp_xgmi_topology_info *top_info = &adev->psp.xgmi_context.top_info;
++	struct psp_xgmi_topology_info *peer_info = &peer_adev->psp.xgmi_context.top_info;
++	int i, j;
++
++	for (i = 0; i < peer_info->num_nodes; i++) {
++		if (peer_info->nodes[i].node_id != adev->gmc.xgmi.node_id)
++			continue;
++
++		for (j = 0; j < top_info->num_nodes; j++) {
++			if (top_info->nodes[j].node_id != peer_adev->gmc.xgmi.node_id)
++				continue;
++
++			peer_info->nodes[i].num_hops = top_info->nodes[j].num_hops;
++			peer_info->nodes[i].is_sharing_enabled = top_info->nodes[j].is_sharing_enabled;
++			peer_info->nodes[i].num_links = top_info->nodes[j].num_links;
++			return;
++		}
++	}
++}
++
+ int amdgpu_xgmi_add_device(struct amdgpu_device *adev)
+ {
+ 	struct psp_xgmi_topology_info *top_info;
+@@ -1059,6 +1082,10 @@
+ 				/* To do: continue with some node failed or disable the whole hive*/
+ 				goto exit_unlock;
+ 			}
++
++			if (adev->psp.xgmi_context.sriov_topology_legacy)
++				list_for_each_entry(tmp_adev, &hive->device_list, gmc.xgmi.head)
++					amdgpu_xgmi_fill_topology_info(adev, tmp_adev);
+ 		} else {
+ 			/* get latest topology info for each device from psp */
+ 			list_for_each_entry(tmp_adev, &hive->device_list, gmc.xgmi.head) {

@@ -41,8 +41,10 @@ EOF
     apt install -y ./${DEBPACKAGE}
     if [[ $DISTRIBUTION == "ubuntu24.04" ]]; then
         apt update
-        apt install -y python3-setuptools python3-wheel
-        apt install -y amdgpu-dkms rocm
+        apt install -y patch python3-setuptools python3-wheel
+        $COMPONENT_DIR/patch_amdgpu_dkms.sh
+        apt install -y /tmp/azhpc-amdgpu-dkms/amdgpu-dkms_*+azhpc1_all.deb rocm
+        apt-mark hold amdgpu-dkms
         # ROCm bundles RCCL
         write_component_version "RCCL" $(dpkg-query -W -f='${Version}' rccl)
     else
