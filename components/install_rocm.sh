@@ -11,7 +11,8 @@ rocm_sha256=$(jq -r '.sha256' <<< $rocm_metadata)
 DEBPACKAGE=$(basename ${rocm_url})
 
 patch_amdgpu_dkms(){
-    local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-legacy-fallback.patch
+    # local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-legacy-fallback.patch
+    local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-amd-sriov-cap.patch
     local work_dir=${AMDGPU_DKMS_PATCH_WORK_DIR:-/tmp/azhpc-amdgpu-dkms}
     local patch_suffix=${AMDGPU_DKMS_PATCH_SUFFIX:-azhpc1}
     local orig_deb src_dir orig_version new_version patched_deb
