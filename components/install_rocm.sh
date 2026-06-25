@@ -10,6 +10,57 @@ rocm_url=$(jq -r '.url' <<< $rocm_metadata)
 rocm_sha256=$(jq -r '.sha256' <<< $rocm_metadata)
 DEBPACKAGE=$(basename ${rocm_url})
 
+patch_amdgpu_dkms(){
+    local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-legacy-fallback.patch
+    local work_dir=${AMDGPU_DKMS_PATCH_WORK_DIR:-/tmp/azhpc-amdgpu-dkms}
+    local patch_suffix=${AMDGPU_DKMS_PATCH_SUFFIX:-azhpc1}
+    local orig_deb src_dir orig_version new_version patched_deb
+
+    if [[ ! -f "${patch_file}" ]]; then
+        echo "Missing amdgpu-dkms patch: ${patch_file}" >&2
+        exit 1
+    fi
+
+    rm -rf "${work_dir}"
+    mkdir -p "${work_dir}"
+    pushd "${work_dir}" >/dev/null
+
+    apt-get download amdgpu-dkms >&2
+    orig_deb=$(find . -maxdepth 1 -type f -name 'amdgpu-dkms_*.deb' | head -n 1)
+    if [[ -z "${orig_deb}" ]]; then
+        echo "Failed to download amdgpu-dkms package" >&2
+        exit 1
+    fi
+
+    dpkg-deb -R "${orig_deb}" pkg
+    src_dir=$(find pkg/usr/src -maxdepth 1 -type d -name 'amdgpu-*' | head -n 1)
+    if [[ -z "${src_dir}" ]]; then
+        echo "Unable to find amdgpu DKMS source tree in ${orig_deb}" >&2
+        exit 1
+    fi
+
+    patch --dry-run -d "${src_dir}" -p1 < "${patch_file}" >&2
+    patch -d "${src_dir}" -p1 < "${patch_file}" >&2
+
+    orig_version=$(dpkg-deb -f "${orig_deb}" Version)
+    new_version="${orig_version}+${patch_suffix}"
+    sed -i "s/^Version: .*/Version: ${new_version}/" pkg/DEBIAN/control
+
+    if [[ -f pkg/DEBIAN/md5sums ]]; then
+        pushd pkg >/dev/null
+        find usr -type f -print0 | sort -z | xargs -0 md5sum > DEBIAN/md5sums
+        popd >/dev/null
+    fi
+
+    patched_deb="${work_dir}/amdgpu-dkms_${new_version#*:}_all.deb"
+    dpkg-deb -b pkg "${patched_deb}" >&2
+    ln -sf "$(basename "${patched_deb}")" "${work_dir}/amdgpu-dkms-patched.deb"
+
+    echo "Built patched amdgpu-dkms package: ${patched_deb}" >&2
+    popd >/dev/null
+    echo "${work_dir}/amdgpu-dkms-patched.deb"
+}
+
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     if [[ $DISTRIBUTION == "ubuntu24.04" ]]; then
         # ROCm 6.4 depends on mivisionx-dev which depends on libopencv-dev which depends on libopenmpi3t64 which depends on libucx0, which is a Ubuntu upstream UCX that
@@ -42,8 +93,8 @@ EOF
     if [[ $DISTRIBUTION == "ubuntu24.04" ]]; then
         apt update
         apt install -y patch python3-setuptools python3-wheel
-        $COMPONENT_DIR/patch_amdgpu_dkms.sh
-        apt install -y /tmp/azhpc-amdgpu-dkms/amdgpu-dkms_*+azhpc1_all.deb rocm
+        patched_amdgpu_dkms_deb=$(patch_amdgpu_dkms)
+        apt install -y "${patched_amdgpu_dkms_deb}" rocm
         apt-mark hold amdgpu-dkms
         # ROCm bundles RCCL
         write_component_version "RCCL" $(dpkg-query -W -f='${Version}' rccl)
