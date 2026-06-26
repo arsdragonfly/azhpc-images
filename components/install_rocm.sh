@@ -10,56 +10,21 @@ rocm_url=$(jq -r '.url' <<< $rocm_metadata)
 rocm_sha256=$(jq -r '.sha256' <<< $rocm_metadata)
 DEBPACKAGE=$(basename ${rocm_url})
 
-patch_amdgpu_dkms(){
-    # local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-legacy-fallback.patch
+configure_amdgpu_dkms_xgmi_patch(){
     local patch_file=${COMPONENT_DIR}/amdgpu-dkms-mi300x-xgmi-amd-sriov-cap.patch
-    local work_dir=${AMDGPU_DKMS_PATCH_WORK_DIR:-/tmp/azhpc-amdgpu-dkms}
-    local patch_suffix=${AMDGPU_DKMS_PATCH_SUFFIX:-azhpc1}
-    local orig_deb src_dir orig_version new_version patched_deb
+    local patch_dir=/etc/dkms/amdgpu/patches
+    local dkms_conf=/etc/dkms/amdgpu.conf
 
     if [[ ! -f "${patch_file}" ]]; then
         echo "Missing amdgpu-dkms patch: ${patch_file}" >&2
         exit 1
     fi
 
-    rm -rf "${work_dir}"
-    mkdir -p "${work_dir}"
-    pushd "${work_dir}" >/dev/null
-
-    apt-get download amdgpu-dkms >&2
-    orig_deb=$(find . -maxdepth 1 -type f -name 'amdgpu-dkms_*.deb' | head -n 1)
-    if [[ -z "${orig_deb}" ]]; then
-        echo "Failed to download amdgpu-dkms package" >&2
-        exit 1
-    fi
-
-    dpkg-deb -R "${orig_deb}" pkg
-    src_dir=$(find pkg/usr/src -maxdepth 1 -type d -name 'amdgpu-*' | head -n 1)
-    if [[ -z "${src_dir}" ]]; then
-        echo "Unable to find amdgpu DKMS source tree in ${orig_deb}" >&2
-        exit 1
-    fi
-
-    patch --dry-run -d "${src_dir}" -p1 < "${patch_file}" >&2
-    patch -d "${src_dir}" -p1 < "${patch_file}" >&2
-
-    orig_version=$(dpkg-deb -f "${orig_deb}" Version)
-    new_version="${orig_version}+${patch_suffix}"
-    sed -i "s/^Version: .*/Version: ${new_version}/" pkg/DEBIAN/control
-
-    if [[ -f pkg/DEBIAN/md5sums ]]; then
-        pushd pkg >/dev/null
-        find usr -type f -print0 | sort -z | xargs -0 md5sum > DEBIAN/md5sums
-        popd >/dev/null
-    fi
-
-    patched_deb="${work_dir}/amdgpu-dkms_${new_version#*:}_all.deb"
-    dpkg-deb -b pkg "${patched_deb}" >&2
-    ln -sf "$(basename "${patched_deb}")" "${work_dir}/amdgpu-dkms-patched.deb"
-
-    echo "Built patched amdgpu-dkms package: ${patched_deb}" >&2
-    popd >/dev/null
-    echo "${work_dir}/amdgpu-dkms-patched.deb"
+    mkdir -p "${patch_dir}"
+    cp "${patch_file}" "${patch_dir}/$(basename "${patch_file}")"
+    cat > "${dkms_conf}" <<EOF
+PATCH[0]="$(basename "${patch_file}")"
+EOF
 }
 
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
@@ -94,9 +59,9 @@ EOF
     if [[ $DISTRIBUTION == "ubuntu24.04" ]]; then
         apt update
         apt install -y patch python3-setuptools python3-wheel
-        patched_amdgpu_dkms_deb=$(patch_amdgpu_dkms)
-        apt install -y "${patched_amdgpu_dkms_deb}" rocm
-        apt-mark hold amdgpu-dkms
+        configure_amdgpu_dkms_xgmi_patch
+        apt install -y rocm
+        check_dkms_status amdgpu
         # ROCm bundles RCCL
         write_component_version "RCCL" $(dpkg-query -W -f='${Version}' rccl)
     else
