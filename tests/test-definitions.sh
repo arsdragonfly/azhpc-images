@@ -192,10 +192,10 @@ function verify_nvidia_driver_installation {
 
     if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
         nvidia_driver_major=${VERSION_NVIDIA%%.*}
-        dpkg-query -W -f='${db:Status-Abbrev}' "linux-modules-nvidia-${nvidia_driver_major}-server-open-azure" 2>/dev/null | grep -q '^ii'
+        dpkg-query -W -f='${db:Status-Abbrev}' "linux-modules-nvidia-${nvidia_driver_major}-open-azure" 2>/dev/null | grep -q '^ii'
         check_exit_code "Canonical prebuilt NVIDIA modules are installed" "Canonical prebuilt NVIDIA modules are not installed"
 
-        ! dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${nvidia_driver_major}-server-open" 2>/dev/null | grep -q '^ii'
+        ! dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${nvidia_driver_major}-open" 2>/dev/null | grep -q '^ii'
         check_exit_code "NVIDIA DKMS package is absent" "NVIDIA DKMS package is installed"
     fi
     
@@ -513,7 +513,14 @@ function verify_lustre_installation {
 
 function verify_gdrcopy_installation {
     # Verify GDRCopy package installation
-    gdrcopy_sanity
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
+        ! dpkg-query -W -f='${db:Status-Abbrev}' gdrdrv-dkms 2>/dev/null | grep -q '^ii'
+        check_exit_code "GDRCopy DKMS package is absent" "GDRCopy DKMS package is installed"
+
+        GDRCOPY_USE_DMABUF_MMAP=1 gdrcopy_sanity
+    else
+        gdrcopy_sanity
+    fi
     check_exit_code "GDRCopy Installed" "GDRCopy not installed!"
 }
 

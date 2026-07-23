@@ -8,7 +8,7 @@ GDRCOPY_VERSION=$(jq -r '.version' <<< $gdrcopy_metadata)
 GDRCOPY_COMMIT=$(jq -r '.commit' <<< $gdrcopy_metadata)
 GDRCOPY_DISTRIBUTION=$(jq -r '.distribution' <<< $gdrcopy_metadata)
 
-if [[ "$TARGET_NODE_TYPE" == "azure_vm_akshost" ]]; then 
+if [[ "$TARGET_NODE_TYPE" == "azure_vm_akshost" && "$DISTRIBUTION" != "ubuntu26.04" ]]; then
     if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
         # Install gdrcopy
         apt install -y build-essential devscripts debhelper check libsubunit-dev fakeroot pkg-config
@@ -66,15 +66,30 @@ else
             sed -i 's|^\(\s*\)FULL_VERSION="\${VERSION}"\s*$|\1FULL_VERSION="${VERSION}-${DEBIAN_VERSION}"|' \
                 build-deb-packages.sh
 
-            CUDA=/usr/local/cuda ./build-deb-packages.sh
-            dpkg -i gdrdrv-dkms_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
-            apt-mark hold gdrdrv-dkms
+            if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+                CUDA=/usr/local/cuda ./build-deb-packages.sh -k
+            else
+                CUDA=/usr/local/cuda ./build-deb-packages.sh
+                dpkg -i gdrdrv-dkms_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
+                apt-mark hold gdrdrv-dkms
+            fi
             dpkg -i libgdrapi_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
             apt-mark hold libgdrapi
             dpkg -i gdrcopy-tests_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}+cuda${CUDA_DRIVER_VERSION}.deb
             apt-mark hold gdrcopy-tests
-            dpkg -i gdrcopy_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
-            apt-mark hold gdrcopy
+            if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+                if dpkg-query -W -f='${db:Status-Abbrev}' gdrdrv-dkms 2>/dev/null | grep -q '^ii'; then
+                    echo "ERROR: gdrdrv-dkms is installed on the DMA-BUF GDRCopy stack" >&2
+                    exit 1
+                fi
+                cat > /etc/profile.d/gdrcopy.sh <<'EOF'
+export GDRCOPY_USE_DMABUF_MMAP=1
+EOF
+                chmod 644 /etc/profile.d/gdrcopy.sh
+            else
+                dpkg -i gdrcopy_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
+                apt-mark hold gdrcopy
+            fi
         elif [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]] || [[ $DISTRIBUTION == rhel* ]]; then
             nvidia_metadata=$(get_component_config "nvidia")
             nvidia_driver_metadata=$(jq -r '.driver' <<< $nvidia_metadata)

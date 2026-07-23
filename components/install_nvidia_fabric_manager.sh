@@ -6,20 +6,28 @@ source ${UTILS_DIR}/utilities.sh
 nvidia_metadata=$(get_component_config "nvidia")
 
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
-    # Ubuntu 26.04 uses Canonical's versioned package so Fabric Manager tracks
-    # the Canonical server driver; other Ubuntu releases use NVIDIA's repo.
+    # Ubuntu 26.04 pins NVIDIA's generic package to the exact Canonical driver
+    # version; other Ubuntu releases use the repository's selected version.
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
     NVIDIA_DRIVER_MAJOR=$(echo $NVIDIA_DRIVER_VERSION | cut -d '.' -f1)
 
-    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
-        PACKAGE_NAME="nvidia-fabricmanager-${NVIDIA_DRIVER_MAJOR}"
-    elif [[ $NVIDIA_DRIVER_MAJOR -ge 580 ]]; then
+    if [[ $NVIDIA_DRIVER_MAJOR -ge 580 ]]; then
         PACKAGE_NAME="nvidia-fabricmanager"
     else
         PACKAGE_NAME="nvidia-fabricmanager-${NVIDIA_DRIVER_MAJOR}"
     fi
 
-    apt install -y ${PACKAGE_NAME}
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+        NVIDIA_FABRICMANAGER_VERSION=$(apt-cache madison "$PACKAGE_NAME" \
+            | awk -v version="$NVIDIA_DRIVER_VERSION" '$3 ~ ("^" version "-") {print $3; exit}')
+        if [[ -z "$NVIDIA_FABRICMANAGER_VERSION" ]]; then
+            echo "ERROR: no $PACKAGE_NAME package matches NVIDIA driver $NVIDIA_DRIVER_VERSION" >&2
+            exit 1
+        fi
+        apt install -y "${PACKAGE_NAME}=${NVIDIA_FABRICMANAGER_VERSION}"
+    else
+        apt install -y ${PACKAGE_NAME}
+    fi
 
     # Read back installed version for the component manifest
     NVIDIA_FABRICMANAGER_VERSION=$(dpkg-query -W -f='${Version}' ${PACKAGE_NAME})

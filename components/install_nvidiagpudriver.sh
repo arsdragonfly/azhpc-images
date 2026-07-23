@@ -50,8 +50,9 @@ elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     fi
 
     if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
-        NVIDIA_MODULES_PACKAGE="linux-modules-nvidia-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open-azure"
-        NVIDIA_DRIVER_PACKAGE="nvidia-driver-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open"
+        NVIDIA_MODULES_PACKAGE="linux-modules-nvidia-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-open-azure"
+        NVIDIA_DRIVER_PACKAGE="nvidia-driver-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-open"
+        NVIDIA_DKMS_PACKAGE="nvidia-dkms-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-open"
 
         apt-get update
         apt-get install -y \
@@ -59,7 +60,7 @@ elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
             "$NVIDIA_DRIVER_PACKAGE" \
             nvidia-modprobe
 
-        if dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open" 2>/dev/null | grep -q '^ii'; then
+        if dpkg-query -W -f='${db:Status-Abbrev}' "$NVIDIA_DKMS_PACKAGE" 2>/dev/null | grep -q '^ii'; then
             echo "ERROR: NVIDIA DKMS was installed with the prebuilt Canonical driver stack" >&2
             exit 1
         fi

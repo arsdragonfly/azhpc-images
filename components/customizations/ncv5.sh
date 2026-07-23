@@ -28,8 +28,16 @@ if nvidia-smi nvlink --status | grep -qa inActive; then
 
     echo "Reloading NVIDIA kernel modules..."
     sudo systemctl stop nvidia-dcgm.service
-    sudo modprobe -r nvidia_drm nvidia_modeset gdrdrv nvidia_peermem nvidia_uvm nvidia  
-    sudo modprobe nvidia nvidia_modeset nvidia_uvm nvidia_peermem gdrdrv nvidia_drm
+    remove_modules=(nvidia_drm nvidia_modeset)
+    load_modules=(nvidia nvidia_modeset nvidia_uvm nvidia_peermem)
+    if modinfo gdrdrv >/dev/null 2>&1; then
+        remove_modules+=(gdrdrv)
+        load_modules+=(gdrdrv)
+    fi
+    remove_modules+=(nvidia_peermem nvidia_uvm nvidia)
+    load_modules+=(nvidia_drm)
+    sudo modprobe -r "${remove_modules[@]}"
+    sudo modprobe "${load_modules[@]}"
     sudo systemctl start nvidia-dcgm.service
 fi
 
