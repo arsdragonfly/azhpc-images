@@ -15,8 +15,9 @@ PMIX_VERSION=$(jq -r '.version' <<< $pmix_metadata)
 if [[ "$GPU" == "AMD" ]]; then
     # AMD has regression on higher versions of HPC-X
     hpcx_metadata=$(get_component_config "hpcx_amd")
-elif [[ "$(sku_network_mode)" == "no_rdma" ]]; then
-    # Non-IB SKUs skip DOCA-OFED. Use inbox HPC-X (UCX linked against kernel-native rdma-core)
+elif [[ "${DISTRIBUTION}" == "ubuntu26.04" || "$(sku_network_mode)" == "no_rdma" ]]; then
+    # Canonical's Resolute package provides kernel modules only, while non-IB
+    # SKUs skip DOCA-OFED entirely. Both use inbox rdma-core userspace.
     hpcx_metadata=$(get_component_config "hpcx_inbox")
 else
     hpcx_metadata=$(get_component_config "hpcx")

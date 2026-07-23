@@ -86,6 +86,13 @@ function sku_has_nvswitch {
 
 # verify OFED installation
 function verify_ofed_installation {
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
+        dpkg-query -W -f='${Status} ${Version}\n' doca-ofed-26.01-dkms 2>/dev/null \
+            | grep -q "^install ok installed ${VERSION_OFED}$"
+        check_exit_code "Canonical DOCA-OFED ${VERSION_OFED} installed" "Canonical DOCA-OFED not installed"
+        return
+    fi
+
     # verify OFED installation
     ofed_info | grep ${VERSION_OFED}
     check_exit_code "OFED installed" "OFED not installed"
@@ -442,12 +449,16 @@ function verify_docker_installation {
 }
 
 function verify_ib_modules_and_devices {
-    if ! systemctl is-active openibd > /dev/null 2>&1; then
-        echo "*** openibd service is not active!" >&2
-        systemctl status --no-pager openibd >&2
-        exit_on_error
-    else
-        echo "[OK] : openibd service is active"
+    # Canonical's kernel-only DOCA-OFED package has no openibd service; its
+    # DKMS modules load through normal PCI discovery and modules-load rules.
+    if [[ "$DISTRIBUTION" != "ubuntu26.04" && "$DISTRIBUTION" != "ubuntu26.04-aks" ]]; then
+        if ! systemctl is-active openibd > /dev/null 2>&1; then
+            echo "*** openibd service is not active!" >&2
+            systemctl status --no-pager openibd >&2
+            exit_on_error
+        else
+            echo "[OK] : openibd service is active"
+        fi
     fi
 
     # Check if all key IB modules are inserted.

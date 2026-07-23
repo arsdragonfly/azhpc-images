@@ -4,7 +4,87 @@ set -ex
 source ${UTILS_DIR}/utilities.sh
 
 doca_metadata=$(get_component_config "doca")
-DOCA_VERSION=$(jq -r '.version' <<< $doca_metadata)
+DOCA_VERSION=$(jq -r '.version' <<< "$doca_metadata")
+
+# Canonical publishes the DOCA-OFED kernel source for Resolute, but not the
+# NVIDIA DOCA userspace or its ofa_kernel post-build layout. Build that layout
+# explicitly so the NVIDIA DKMS conftest enables nvidia-peermem.
+if [[ "${DISTRIBUTION}" == "ubuntu26.04" ]]; then
+    DOCA_PACKAGE=$(jq -r '.package' <<< "$doca_metadata")
+    if [[ -z "$DOCA_PACKAGE" || "$DOCA_PACKAGE" == "null" ]]; then
+        echo "ERROR: Canonical DOCA-OFED package metadata is missing" >&2
+        exit 1
+    fi
+
+    if command -v add-apt-repository >/dev/null 2>&1; then
+        add-apt-repository -y universe
+    fi
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        "$DOCA_PACKAGE" \
+        rdma-core ibverbs-utils ibverbs-providers infiniband-diags perftest \
+        libibverbs-dev libibumad-dev librdmacm-dev libibmad-dev
+
+    # Do not mix Canonical's prebuilt linux-modules-doca-ofed package with a
+    # local DKMS build; their symbol CRCs may differ.
+    if dpkg-query -W -f='${db:Status-Abbrev}' linux-modules-doca-ofed-26.01-azure 2>/dev/null | grep -q '^ii'; then
+        echo "ERROR: prebuilt linux-modules-doca-ofed-26.01-azure conflicts with the DKMS-only stack" >&2
+        exit 1
+    fi
+
+    DOCA_DKMS_SRC=$(find /usr/src -maxdepth 1 -type d -name 'doca-ofed-26.01-dkms-*' -print -quit)
+    if [[ -z "${DOCA_DKMS_SRC}" ]]; then
+        echo "ERROR: doca-ofed-26.01-dkms source tree not found under /usr/src" >&2
+        exit 1
+    fi
+
+    DOCA_BUILD_TMP=$(mktemp -d)
+    trap 'rm -rf "${DOCA_BUILD_TMP}"' EXIT
+    cp -a "${DOCA_DKMS_SRC}/." "${DOCA_BUILD_TMP}/"
+    (
+        cd "${DOCA_BUILD_TMP}/mlnx-ofed-kernel"
+        ./configure \
+            --kernel-version="$(uname -r)" \
+            --kernel-sources="/lib/modules/$(uname -r)/build" \
+            --with-core-mod \
+            --with-user_mad-mod \
+            --with-user_access-mod \
+            --with-addr_trans-mod \
+            --with-mlx5-mod \
+            --with-mlxfw-mod \
+            --with-ipoib-mod
+        make -j"$(nproc)"
+    )
+
+    OFA_DST=/usr/src/ofa_kernel-dkms/default
+    rm -rf "${OFA_DST}"
+    mkdir -p "${OFA_DST}"
+    cp -ar "${DOCA_BUILD_TMP}/mlnx-ofed-kernel/include" "${OFA_DST}/"
+    cp -ar "${DOCA_BUILD_TMP}/mlnx-ofed-kernel"/config* "${OFA_DST}/"
+    cp -ar "${DOCA_BUILD_TMP}/mlnx-ofed-kernel"/compat* "${OFA_DST}/"
+    cp -ar "${DOCA_BUILD_TMP}/mlnx-ofed-kernel/ofed_scripts" "${OFA_DST}/"
+    cp -a "${DOCA_BUILD_TMP}/mlnx-ofed-kernel/Module.symvers" "${OFA_DST}/"
+
+    mkdir -p /usr/src/ofa_kernel
+    update-alternatives --install \
+        /usr/src/ofa_kernel/default ofa_kernel_headers "${OFA_DST}" 17
+
+    for required_symbol in ib_register_peer_memory_client ib_umem_dmabuf_get_pinned; do
+        if ! grep -q "${required_symbol}" "${OFA_DST}/Module.symvers"; then
+            echo "ERROR: ${required_symbol} missing from generated Module.symvers" >&2
+            exit 1
+        fi
+    done
+
+    rm -rf "${DOCA_BUILD_TMP}"
+    trap - EXIT
+
+    DOCA_OFED_VERSION=$(dpkg-query -W -f='${Version}' "$DOCA_PACKAGE")
+    write_component_version "DOCA" "$DOCA_VERSION"
+    write_component_version "OFED" "${DOCA_OFED_VERSION}"
+    exit 0
+fi
+
 DOCA_SOURCE=$(jq -r '.source' <<< $doca_metadata)
 
 if [[ "$DOCA_SOURCE" == "private" ]]; then

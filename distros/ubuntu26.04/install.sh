@@ -43,7 +43,8 @@ fi
 # $COMPONENT_DIR/install_lustre_client.sh
 echo "##[warning]Skipping Lustre client install on Ubuntu 26.04 (no AMLFS packages for this kernel/distro yet)."
 
-# install DOCA OFED
+# Install Canonical's kernel-only DOCA-OFED package and generate the OFA
+# symbol/header tree before NVIDIA DKMS builds nvidia-peermem.
 $COMPONENT_DIR/install_doca.sh
 
 # install PMIX

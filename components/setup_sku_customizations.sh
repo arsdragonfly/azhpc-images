@@ -125,10 +125,15 @@ exit 1
 fi
 chmod 755 /usr/sbin/remove_sku_customizations.sh
 
+sku_customizations_after="network-online.target rdma-hw.target"
+if [[ "${DISTRIBUTION}" != "ubuntu26.04" ]]; then
+    sku_customizations_after+=" openibd.service"
+fi
+
 cat <<EOF >/etc/systemd/system/sku-customizations.service
 [Unit]
 Description=Customizations based on SKU
-After=network-online.target openibd.service rdma-hw.target
+After=${sku_customizations_after}
 Wants=network-online.target
 EOF
 
@@ -152,7 +157,7 @@ StandardOutput=journal
 WantedBy=multi-user.target
 EOF
 
-if [ "$GPU" = "NVIDIA" ]; then
+if [[ "$GPU" == "NVIDIA" && "${DISTRIBUTION}" != "ubuntu26.04" ]]; then
     mkdir -p /etc/systemd/system/openibd.service.d
     cat <<EOF >/etc/systemd/system/openibd.service.d/10-nvidia-peermem.conf
 [Service]

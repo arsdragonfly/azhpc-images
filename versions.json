@@ -57,9 +57,9 @@
         },
         "ubuntu26.04": {
             "x86_64": {
-                "version": "3.4.0",
-                "sha256": "60789bbbfc9b283a87a64589a0d4bd5d08d1b746494c24ce05e10bbd694de6bb",
-                "url": "https://www.mellanox.com/downloads/DOCA/DOCA_v3.4.0/host/doca-host_3.4.0-085000-26.04-ubuntu2604_amd64.deb"
+                "version": "26.01-canonical",
+                "package": "doca-ofed-26.01-dkms",
+                "source": "distribution"
             }
         },
         "almalinux8.10": {
@@ -285,6 +285,14 @@
     },
     "hpcx_inbox": {
         "ubuntu24.04": {
+            "x86_64": {
+                "version": "2.25.1",
+                "sha256": "409ad5ea645338626a73f23832a83b835f7fbd8c06b95496127c18bb091dd46e",
+                "url": "https://content.mellanox.com/hpc/hpc-x/v2.25.1_cuda13/hpcx-v2.25.1-gcc-inbox-ubuntu24.04-cuda13-x86_64.tbz"
+            }
+        },
+        "ubuntu26.04": {
+            "_comment": "NVIDIA does not publish an Ubuntu 26.04 inbox artifact as of HPC-X 2.50. Use the validated Ubuntu 24.04 CUDA 13 build as a compatibility fallback.",
             "x86_64": {
                 "version": "2.25.1",
                 "sha256": "409ad5ea645338626a73f23832a83b835f7fbd8c06b95496127c18bb091dd46e",
