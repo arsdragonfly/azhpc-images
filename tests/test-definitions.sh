@@ -87,9 +87,12 @@ function sku_has_nvswitch {
 # verify OFED installation
 function verify_ofed_installation {
     if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
-        dpkg-query -W -f='${Status} ${Version}\n' doca-ofed-26.01-dkms 2>/dev/null \
+        dpkg-query -W -f='${Status} ${Version}\n' linux-modules-doca-ofed-26.01-azure 2>/dev/null \
             | grep -q "^install ok installed ${VERSION_OFED}$"
         check_exit_code "Canonical DOCA-OFED ${VERSION_OFED} installed" "Canonical DOCA-OFED not installed"
+
+        ! dpkg-query -W -f='${db:Status-Abbrev}' doca-ofed-26.01-dkms 2>/dev/null | grep -q '^ii'
+        check_exit_code "DOCA-OFED DKMS package is absent" "DOCA-OFED DKMS package is installed"
         return
     fi
 
@@ -186,6 +189,15 @@ function verify_nvidia_driver_installation {
     # Verify NVIDIA Driver installation
     nvidia_driver_cuda_version=$(nvidia-smi --version | tail -n 1 | awk -F':' '{print $2}' | tr -d "[:space:]")
     check_exit_code "NVIDIA Driver ${VERSION_NVIDIA}" "Failed to run NVIDIA SMI"
+
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
+        nvidia_driver_major=${VERSION_NVIDIA%%.*}
+        dpkg-query -W -f='${db:Status-Abbrev}' "linux-modules-nvidia-${nvidia_driver_major}-server-open-azure" 2>/dev/null | grep -q '^ii'
+        check_exit_code "Canonical prebuilt NVIDIA modules are installed" "Canonical prebuilt NVIDIA modules are not installed"
+
+        ! dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${nvidia_driver_major}-server-open" 2>/dev/null | grep -q '^ii'
+        check_exit_code "NVIDIA DKMS package is absent" "NVIDIA DKMS package is installed"
+    fi
     
     # Verify if NVIDIA peer memory module is inserted on SKUs with IB
     # Any of the MRC bring up doesn't require nvidia_peermem
@@ -450,7 +462,7 @@ function verify_docker_installation {
 
 function verify_ib_modules_and_devices {
     # Canonical's kernel-only DOCA-OFED package has no openibd service; its
-    # DKMS modules load through normal PCI discovery and modules-load rules.
+    # prebuilt modules load through normal PCI discovery and modules-load rules.
     if [[ "$DISTRIBUTION" != "ubuntu26.04" && "$DISTRIBUTION" != "ubuntu26.04-aks" ]]; then
         if ! systemctl is-active openibd > /dev/null 2>&1; then
             echo "*** openibd service is not active!" >&2

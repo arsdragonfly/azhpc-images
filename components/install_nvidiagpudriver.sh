@@ -40,6 +40,7 @@ if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
 elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     # APT-based NVIDIA driver installation for Ubuntu
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
+    NVIDIA_GPU_DRIVER_MAJOR_VERSION=${NVIDIA_DRIVER_VERSION%%.*}
     CUDA_DRIVER_DISTRIBUTION=$(jq -r '.driver.distribution' <<< $cuda_metadata)
 
     if [ "$ARCHITECTURE" = "aarch64" ]; then
@@ -47,41 +48,68 @@ elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     else
         CUDA_ARCHITECTURE="x86_64"
     fi
-    # Add NVIDIA CUDA APT repo (provides both driver and toolkit packages)
-    wget https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/cuda-keyring_1.1-1_all.deb
-    dpkg -i ./cuda-keyring_1.1-1_all.deb
-    apt-get update
 
-    # MRC image uses local NVIDIA repo for nvidia driver packages
-    # The local NVIDIA repo and cuda repo downloaded from online contain the nvidia driver packages: prefer NVIDIA local repo over other sources
-    # Nvidia driver packages should be installed from the local NVIDIA repo
-    # Cuda toolkit packages should be installed from the downloaded CUDA repo
-    if _is_mrc_network; then
-        NVIDIA_GPU_DRIVER_REPO_FILE=$(jq -r '.driver.repo_file' <<< $nvidia_metadata)
-        dpkg -i $TOP_DIR/internal_bits/$NVIDIA_GPU_DRIVER_REPO_FILE
-        NVIDIA_GPU_DRIVER_REPO_DIR=$(echo $NVIDIA_GPU_DRIVER_REPO_FILE | awk -F'_' '{print $1}')
-        cp /var/$NVIDIA_GPU_DRIVER_REPO_DIR/nvidia-driver-local-*-keyring.gpg /usr/share/keyrings/
-        
-        # Set preference BEFORE apt update so priority rules are applied during metadata refresh
-        cat <<EOF > /etc/apt/preferences.d/00-nvidia-prefer
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+        NVIDIA_MODULES_PACKAGE="linux-modules-nvidia-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open-azure"
+        NVIDIA_DRIVER_PACKAGE="nvidia-driver-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open"
+
+        apt-get update
+        apt-get install -y \
+            "$NVIDIA_MODULES_PACKAGE" \
+            "$NVIDIA_DRIVER_PACKAGE" \
+            nvidia-modprobe
+
+        if dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${NVIDIA_GPU_DRIVER_MAJOR_VERSION}-server-open" 2>/dev/null | grep -q '^ii'; then
+            echo "ERROR: NVIDIA DKMS was installed with the prebuilt Canonical driver stack" >&2
+            exit 1
+        fi
+
+        NVIDIA_DRIVER_VERSION=$(dpkg-query -W -f='${Version}' "$NVIDIA_DRIVER_PACKAGE" | sed 's/-.*//')
+    else
+        # Add NVIDIA CUDA APT repo (provides both driver and toolkit packages)
+        wget https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/cuda-keyring_1.1-1_all.deb
+        dpkg -i ./cuda-keyring_1.1-1_all.deb
+        apt-get update
+
+        # MRC image uses local NVIDIA repo for nvidia driver packages
+        # The local NVIDIA repo and cuda repo downloaded from online contain the nvidia driver packages: prefer NVIDIA local repo over other sources
+        # Nvidia driver packages should be installed from the local NVIDIA repo
+        # Cuda toolkit packages should be installed from the downloaded CUDA repo
+        if _is_mrc_network; then
+            NVIDIA_GPU_DRIVER_REPO_FILE=$(jq -r '.driver.repo_file' <<< $nvidia_metadata)
+            dpkg -i $TOP_DIR/internal_bits/$NVIDIA_GPU_DRIVER_REPO_FILE
+            NVIDIA_GPU_DRIVER_REPO_DIR=$(echo $NVIDIA_GPU_DRIVER_REPO_FILE | awk -F'_' '{print $1}')
+            cp /var/$NVIDIA_GPU_DRIVER_REPO_DIR/nvidia-driver-local-*-keyring.gpg /usr/share/keyrings/
+
+            # Set preference BEFORE apt update so priority rules are applied during metadata refresh
+            cat <<EOF > /etc/apt/preferences.d/00-nvidia-prefer
 Package: *
 Pin: origin ""
 Pin-Priority: 1001
 EOF
-        apt update
-    fi
-    # Pin the driver version and install via APT packages
-    apt install nvidia-driver-pinning-${NVIDIA_DRIVER_VERSION} -y
+            apt update
+        fi
+        # Pin the driver version and install via APT packages
+        apt install nvidia-driver-pinning-${NVIDIA_DRIVER_VERSION} -y
 
-    if [ "$SKU" = "V100" ]; then
-        # V100 requires proprietary kernel modules
-        apt install cuda-drivers -y
-    elif [[ "${NVLINK_RACKSCALE,,}" == "true" ]]; then
-        NVIDIA_GPU_DRIVER_MAJOR_VERSION=$(jq -r '.driver.major_version' <<< $nvidia_metadata)
-        apt install nvidia-dkms-$NVIDIA_GPU_DRIVER_MAJOR_VERSION-open nvidia-driver-$NVIDIA_GPU_DRIVER_MAJOR_VERSION-open nvidia-modprobe -y
-    else
-        # A100, H100, H200 use open kernel modules
-        apt install nvidia-open -y
+        if [ "$SKU" = "V100" ]; then
+            # V100 requires proprietary kernel modules
+            apt install cuda-drivers -y
+        elif [[ "${NVLINK_RACKSCALE,,}" == "true" ]]; then
+            NVIDIA_GPU_DRIVER_MAJOR_VERSION=$(jq -r '.driver.major_version' <<< $nvidia_metadata)
+            apt install nvidia-dkms-$NVIDIA_GPU_DRIVER_MAJOR_VERSION-open nvidia-driver-$NVIDIA_GPU_DRIVER_MAJOR_VERSION-open nvidia-modprobe -y
+        else
+            # A100, H100, H200 use open kernel modules
+            apt install nvidia-open -y
+        fi
+    fi
+
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+        # Add NVIDIA's repository only after the Canonical driver is complete;
+        # it is retained for CUDA toolkit packages, not kernel modules.
+        wget https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/cuda-keyring_1.1-1_all.deb
+        dpkg -i ./cuda-keyring_1.1-1_all.deb
+        apt-get update
     fi
 
     # Remove unused configuration file if created by the NVIDIA driver package
@@ -92,13 +120,11 @@ EOF
 
     # nvidia-peermem is NOT modprobe'd at build time. Loading it before the
     # first reboot is fragile across the matrix of distros / kernels we
-    # support (e.g. Ubuntu 26.04 needs DOCA-OFED's patched ib_core in
-    # /lib/modules/$(uname -r)/updates/dkms/ which is not active in the
-    # build kernel; general-purpose build SKUs have no IB hardware to load
-    # against; baremetal builds reboot before IB is fully up). The module is
-    # queued for first boot via /etc/modules-load.d/nvidia-peermem.conf
-    # written below and via the openibd ExecStartPost drop-in installed by
-    # setup_sku_customizations.sh.
+    # support (the build kernel may differ from the target kernel;
+    # general-purpose build SKUs have no IB hardware to load against;
+    # baremetal builds reboot before IB is fully up). The module is queued
+    # for first boot via /etc/modules-load.d/nvidia-peermem.conf written
+    # below and, on stacks that provide openibd, its ExecStartPost drop-in.
 else
     # RHEL-family: AlmaLinux, Rocky Linux, RHEL - .run file installation
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)

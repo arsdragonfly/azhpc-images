@@ -58,7 +58,7 @@
         "ubuntu26.04": {
             "x86_64": {
                 "version": "26.01-canonical",
-                "package": "doca-ofed-26.01-dkms",
+                "package": "linux-modules-doca-ofed-26.01-azure",
                 "source": "distribution"
             }
         },
@@ -429,7 +429,7 @@
         "ubuntu26.04": {
             "x86_64": {
                 "driver": {
-                    "version": "595.58.03"
+                    "version": "595.71.05"
                 }
             }
         },

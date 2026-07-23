@@ -6,12 +6,14 @@ source ${UTILS_DIR}/utilities.sh
 nvidia_metadata=$(get_component_config "nvidia")
 
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
-    # Install from NVIDIA APT repo (already configured during driver installation)
-    # Pinning package ensures the correct version is installed
+    # Ubuntu 26.04 uses Canonical's versioned package so Fabric Manager tracks
+    # the Canonical server driver; other Ubuntu releases use NVIDIA's repo.
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
     NVIDIA_DRIVER_MAJOR=$(echo $NVIDIA_DRIVER_VERSION | cut -d '.' -f1)
 
-    if [[ $NVIDIA_DRIVER_MAJOR -ge 580 ]]; then
+    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+        PACKAGE_NAME="nvidia-fabricmanager-${NVIDIA_DRIVER_MAJOR}"
+    elif [[ $NVIDIA_DRIVER_MAJOR -ge 580 ]]; then
         PACKAGE_NAME="nvidia-fabricmanager"
     else
         PACKAGE_NAME="nvidia-fabricmanager-${NVIDIA_DRIVER_MAJOR}"
