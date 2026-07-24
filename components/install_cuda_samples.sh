@@ -15,8 +15,18 @@ CUDA_SAMPLES_DOWNLOAD_URL=https://github.com/NVIDIA/cuda-samples/archive/refs/ta
 download_and_verify ${CUDA_SAMPLES_DOWNLOAD_URL} ${CUDA_SAMPLES_SHA256}
 tar -xvf ${TARBALL}
 pushd ./cuda-samples-${CUDA_SAMPLES_VERSION}
+
+if [[ -d cpp ]]; then
+	CUDA_SAMPLES_SUBDIR=cpp
+elif [[ -d Samples ]]; then
+	CUDA_SAMPLES_SUBDIR=Samples
+else
+	echo "ERROR: CUDA samples source directory not found" >&2
+	exit 1
+fi
+
 mkdir build && cd build
 cmake -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc ..
 make -j $(nproc)
-mv -vT ./Samples /usr/local/cuda-${CUDA_DRIVER_VERSION}/samples
+mv -vT "./${CUDA_SAMPLES_SUBDIR}" /usr/local/cuda-${CUDA_DRIVER_VERSION}/samples
 popd
