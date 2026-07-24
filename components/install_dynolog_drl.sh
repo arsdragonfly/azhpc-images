@@ -29,9 +29,13 @@ if [[ "$GPU" == "NVIDIA" ]]; then
     if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
         tdnf install -y cmake rust cargo ninja-build build-essential
     elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
-        apt-get install -y cmake rustc-1.82 cargo-1.82 ninja-build build-essential
+        if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
+            apt-get install -y cmake rustc cargo ninja-build build-essential
+        else
+            apt-get install -y cmake rustc-1.82 cargo-1.82 ninja-build build-essential
+            export PATH="/usr/lib/rust-1.82/bin:$PATH"
+        fi
         apt-get install -y g++ pkg-config uuid-dev libssl-dev
-        export PATH="/usr/lib/rust-1.82/bin:$PATH"
     elif [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]]; then
         yum install -y cmake rust cargo ninja-build libuuid-devel gcc-toolset-12
         if [[ $DISTRIBUTION == almalinux8.10 ]] || [[ $DISTRIBUTION == rocky8.10 ]]; then
