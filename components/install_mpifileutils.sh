@@ -14,11 +14,7 @@ MPIFILEUTILS_SHA256=$(jq -r '.sha256' <<< $mpifileutils_metadata)
 INSTALL_PREFIX="/opt/mpifileutils"
 BUILD_DIR="/tmp/mpifileutils-build"
 SRC_DIR="/tmp/mpifileutils-src"
-LUSTRE_CMAKE_FLAG="ON"
-
-if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
-    LUSTRE_CMAKE_FLAG="OFF"
-fi
+LUSTRE_CMAKE_FLAG="OFF"
 
 echo "=== Installing mpifileutils ${MPIFILEUTILS_VERSION} ==="
 
@@ -31,6 +27,19 @@ else
     # RHEL-family: AlmaLinux, Rocky Linux, RHEL, etc.
     yum install -y bzip2-devel libattr-devel libarchive-devel
 fi
+
+LUSTRE_PROBE=$(mktemp)
+if printf '%s\n' \
+    '#include <lustre/lustreapi.h>' \
+    '#include <lustre/lustre_user.h>' \
+    'int main(void) { return 0; }' \
+    | cc -x c - -o "${LUSTRE_PROBE}" -llustreapi >/dev/null 2>&1; then
+    LUSTRE_CMAKE_FLAG="ON"
+    echo "Lustre development files found; enabling mpiFileUtils Lustre integration."
+else
+    echo "Lustre development files not found; building mpiFileUtils without Lustre integration."
+fi
+rm -f "${LUSTRE_PROBE}"
 
 # Create directories
 mkdir -p "${INSTALL_PREFIX}"
