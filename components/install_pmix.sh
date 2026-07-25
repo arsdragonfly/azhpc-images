@@ -55,11 +55,11 @@ EOF
         # Hard pin: the noble pool is allowed to supply ONLY `pmix`.
         cat > /etc/apt/preferences.d/azhpc-pmc-slurm-noble.pref <<'EOF'
 Package: *
-Pin: origin packages.microsoft.com
+Pin: release o=slurm-ubuntu-noble*
 Pin-Priority: -1
 
 Package: pmix
-Pin: origin packages.microsoft.com
+Pin: release o=slurm-ubuntu-noble*
 Pin-Priority: 1001
 EOF
 
