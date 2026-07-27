@@ -20,6 +20,20 @@ set -euox pipefail
 # =============================================================================
 
 ####
+# @Brief        : Configure apt/dpkg lock timeout to reduce lock contention failures
+# @Param        : None
+# @RetVal       : 0 on success
+####
+configure_apt_lock_timeout() {
+    if [[ "${OS_FAMILY}" != "ubuntu" ]]; then
+        return 0
+    fi
+
+    echo "##[section]Configuring apt dpkg lock timeout"
+    printf 'DPkg::Lock::Timeout "300";\n' > /etc/apt/apt.conf.d/99dpkg-lock-timeout
+}
+
+####
 # @Brief        : Wait for apt lock to be released and cloud-init to complete
 # @Param        : None
 # @RetVal       : 0 on success
@@ -480,6 +494,8 @@ echo "OS: ${OS_FAMILY:-unknown} ${DISTRO_VERSION:-unknown}"
 echo "GPU SKU: ${GPU_SKU:?GPU_SKU is required}"
 echo "Target Image Variant: ${TARGET_NODE_TYPE:-azure_vm_regular}"
 echo "=========================================="
+
+configure_apt_lock_timeout
  
 if [[ "${GPU_SKU}" == "GB200" && "${DISTRO_VERSION}" == "24.04" ]]; then
     # Configure GB200 PARTUUID if specified
