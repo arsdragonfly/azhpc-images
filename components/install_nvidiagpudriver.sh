@@ -119,13 +119,6 @@ EOF
     # Apply nvprofiling settings
     echo 'options nvidia NVreg_RestrictProfilingToAdminUsers=0' | tee /etc/modprobe.d/nvprofiling.conf
 
-    # nvidia-peermem is NOT modprobe'd at build time. Loading it before the
-    # first reboot is fragile across the matrix of distros / kernels we
-    # support (the build kernel may differ from the target kernel;
-    # general-purpose build SKUs have no IB hardware to load against;
-    # baremetal builds reboot before IB is fully up). The module is queued
-    # for first boot via /etc/modules-load.d/nvidia-peermem.conf written
-    # below and, on stacks that provide openibd, its ExecStartPost drop-in.
 else
     # RHEL-family: AlmaLinux, Rocky Linux, RHEL - .run file installation
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
@@ -144,15 +137,14 @@ else
     if [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]] || [[ $DISTRIBUTION == rhel* ]]; then
         dkms install --no-depmod -m nvidia -v ${NVIDIA_DRIVER_VERSION} -k `uname -r` --force
     fi
-    # nvidia-peermem is NOT modprobe'd at build time -- see comment in the
-    # Ubuntu branch above. The module is queued for first boot via
-    # /etc/modules-load.d/nvidia-peermem.conf written below and via the
-    # openibd ExecStartPost drop-in installed by setup_sku_customizations.sh.
 fi
 write_component_version "NVIDIA" ${NVIDIA_DRIVER_VERSION}
 
-touch /etc/modules-load.d/nvidia-peermem.conf
-echo "nvidia_peermem" >> /etc/modules-load.d/nvidia-peermem.conf
+# Queue the legacy peer-memory module only on stacks that do not use DMA-BUF.
+NVIDIA_PEERMEM_CONFIG=/etc/modules-load.d/nvidia-peermem.conf
+if [[ "$DISTRIBUTION" != "ubuntu26.04" && "$DISTRIBUTION" != "ubuntu26.04-aks" ]]; then
+    echo "nvidia_peermem" > "$NVIDIA_PEERMEM_CONFIG"
+fi
 
 
 if [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" == "baremetal_1p" ]]; then

@@ -27,5 +27,6 @@ while ! systemctl is-active --quiet nvidia-fabricmanager; do
 done
 echo "NVIDIA Fabric Manager is active."
 
-## load nvidia-peermem module
-modprobe nvidia-peermem
+if [[ -s /etc/modules-load.d/nvidia-peermem.conf ]]; then
+    modprobe nvidia-peermem
+fi

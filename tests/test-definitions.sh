@@ -197,11 +197,17 @@ function verify_nvidia_driver_installation {
 
         ! dpkg-query -W -f='${db:Status-Abbrev}' "nvidia-dkms-${nvidia_driver_major}-open" 2>/dev/null | grep -q '^ii'
         check_exit_code "NVIDIA DKMS package is absent" "NVIDIA DKMS package is installed"
+
+        [[ ! -s /etc/modules-load.d/nvidia-peermem.conf ]]
+        check_exit_code "NVIDIA peer memory boot configuration is absent" "NVIDIA peer memory is configured to load"
+
+        ! lsmod | grep -q '^nvidia_peermem '
+        check_exit_code "NVIDIA peer memory module is absent" "NVIDIA peer memory module is loaded"
     fi
     
-    # Verify if NVIDIA peer memory module is inserted on SKUs with IB
-    # Any of the MRC bring up doesn't require nvidia_peermem
-    if [[ "$(sku_network_mode)" == "standard_ib" ]]; then
+    # Verify if NVIDIA peer memory module is inserted on SKUs with IB.
+    # Ubuntu 26.04 uses DMA-BUF for GPUDirect instead of nvidia_peermem.
+    if [[ "$(sku_network_mode)" == "standard_ib" && "$DISTRIBUTION" != "ubuntu26.04" && "$DISTRIBUTION" != "ubuntu26.04-aks" ]]; then
         lsmod | grep nvidia_peermem
         check_exit_code "NVIDIA Peer memory module is inserted" "NVIDIA Peer memory module is not inserted!"
     fi

@@ -157,7 +157,7 @@ StandardOutput=journal
 WantedBy=multi-user.target
 EOF
 
-if [[ "$GPU" == "NVIDIA" && "${DISTRIBUTION}" != "ubuntu26.04" ]]; then
+if [[ "$GPU" == "NVIDIA" && -s /etc/modules-load.d/nvidia-peermem.conf ]]; then
     mkdir -p /etc/systemd/system/openibd.service.d
     cat <<EOF >/etc/systemd/system/openibd.service.d/10-nvidia-peermem.conf
 [Service]
