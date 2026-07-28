@@ -31,6 +31,10 @@ else
    sed -i 's#\* || check_nccl_allreduce 431.0 1 16G $AZ_NHC_ROOT/topofiles/ndv5-topo.xml#\* || check_nccl_allreduce 431.0 1 16G#' ./conf/nd96isr_h200_v5.conf
    sed -i 's#\* || check_nccl_allreduce 460.0 1 16G $AZ_NHC_ROOT/topofiles/ndv5-topo.xml#\* || check_nccl_allreduce 460.0 1 16G#' ./conf/nd96isr_h100_v5.conf
 
+   if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+      sed -i 's/--use_cuda=$dev_idx/--use_cuda=$dev_idx --use_cuda_dmabuf/g' ./customTests/azure_ib_write_bw_gdr.nhc
+   fi
+
    ./dockerfile/pull-image-mcr.sh cuda
 fi
 popd
