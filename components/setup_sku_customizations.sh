@@ -125,15 +125,10 @@ exit 1
 fi
 chmod 755 /usr/sbin/remove_sku_customizations.sh
 
-sku_customizations_after="network-online.target rdma-hw.target"
-if [[ "${DISTRIBUTION}" != "ubuntu26.04" ]]; then
-    sku_customizations_after+=" openibd.service"
-fi
-
 cat <<EOF >/etc/systemd/system/sku-customizations.service
 [Unit]
 Description=Customizations based on SKU
-After=${sku_customizations_after}
+After=network-online.target openibd.service rdma-hw.target
 Wants=network-online.target
 EOF
 

@@ -87,12 +87,27 @@ function sku_has_nvswitch {
 # verify OFED installation
 function verify_ofed_installation {
     if [[ "$DISTRIBUTION" == "ubuntu26.04" || "$DISTRIBUTION" == "ubuntu26.04-aks" ]]; then
-        dpkg-query -W -f='${Status} ${Version}\n' linux-modules-doca-ofed-26.01-azure 2>/dev/null \
-            | grep -q "^install ok installed ${VERSION_OFED}$"
-        check_exit_code "Canonical DOCA-OFED ${VERSION_OFED} installed" "Canonical DOCA-OFED not installed"
+        dpkg-query -W -f='${Status}\n' linux-modules-doca-ofed-26.01-azure 2>/dev/null \
+            | grep -q '^install ok installed$'
+        check_exit_code "Canonical DOCA-OFED modules installed" "Canonical DOCA-OFED modules not installed"
 
-        ! dpkg-query -W -f='${db:Status-Abbrev}' doca-ofed-26.01-dkms 2>/dev/null | grep -q '^ii'
-        check_exit_code "DOCA-OFED DKMS package is absent" "DOCA-OFED DKMS package is installed"
+        dpkg-query -W -f='${Status} ${Version}\n' doca-ofed-userspace 2>/dev/null \
+            | grep -q "^install ok installed ${VERSION_DOCA}-"
+        check_exit_code "NVIDIA DOCA-OFED userspace ${VERSION_DOCA} installed" "NVIDIA DOCA-OFED userspace not installed"
+
+        ofed_info -n | grep -q "${VERSION_OFED}"
+        check_exit_code "NVIDIA OFED userspace ${VERSION_OFED} is available" "NVIDIA OFED userspace is unavailable"
+
+        command -v ibdev2netdev
+        check_exit_code "ibdev2netdev is available" "ibdev2netdev is unavailable"
+
+        local dkms_package
+        for dkms_package in \
+            doca-ofed-26.01-dkms mlnx-ofed-kernel-dkms \
+            iser-dkms isert-dkms srp-dkms xpmem-dkms kernel-mft-dkms; do
+            ! dpkg-query -W -f='${db:Status-Abbrev}' "$dkms_package" 2>/dev/null | grep -q '^ii'
+            check_exit_code "$dkms_package is absent" "$dkms_package is installed"
+        done
         return
     fi
 
@@ -467,16 +482,12 @@ function verify_docker_installation {
 }
 
 function verify_ib_modules_and_devices {
-    # Canonical's kernel-only DOCA-OFED package has no openibd service; its
-    # prebuilt modules load through normal PCI discovery and modules-load rules.
-    if [[ "$DISTRIBUTION" != "ubuntu26.04" && "$DISTRIBUTION" != "ubuntu26.04-aks" ]]; then
-        if ! systemctl is-active openibd > /dev/null 2>&1; then
-            echo "*** openibd service is not active!" >&2
-            systemctl status --no-pager openibd >&2
-            exit_on_error
-        else
-            echo "[OK] : openibd service is active"
-        fi
+    if ! systemctl is-active openibd > /dev/null 2>&1; then
+        echo "*** openibd service is not active!" >&2
+        systemctl status --no-pager openibd >&2
+        exit_on_error
+    else
+        echo "[OK] : openibd service is active"
     fi
 
     # Check if all key IB modules are inserted.

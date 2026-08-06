@@ -43,7 +43,7 @@ fi
 # $COMPONENT_DIR/install_lustre_client.sh
 echo "##[warning]Skipping Lustre client install on Ubuntu 26.04 (no AMLFS packages for this kernel/distro yet)."
 
-# Install Canonical's prebuilt DOCA-OFED modules for the Azure kernel.
+# Install NVIDIA DOCA-OFED userspace with Canonical's prebuilt Azure modules.
 $COMPONENT_DIR/install_doca.sh
 
 # install PMIX

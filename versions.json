@@ -57,7 +57,9 @@
         },
         "ubuntu26.04": {
             "x86_64": {
-                "version": "26.01-canonical",
+                "version": "3.4.0",
+                "sha256": "60789bbbfc9b283a87a64589a0d4bd5d08d1b746494c24ce05e10bbd694de6bb",
+                "url": "https://www.mellanox.com/downloads/DOCA/DOCA_v3.4.0/host/doca-host_3.4.0-085000-26.04-ubuntu2604_amd64.deb",
                 "package": "linux-modules-doca-ofed-26.01-azure",
                 "source": "distribution"
             }

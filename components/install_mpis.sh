@@ -15,9 +15,8 @@ PMIX_VERSION=$(jq -r '.version' <<< $pmix_metadata)
 if [[ "$GPU" == "AMD" ]]; then
     # AMD has regression on higher versions of HPC-X
     hpcx_metadata=$(get_component_config "hpcx_amd")
-elif [[ "${DISTRIBUTION}" == "ubuntu26.04" || "$(sku_network_mode)" == "no_rdma" ]]; then
-    # Canonical's Resolute package provides kernel modules only, while non-IB
-    # SKUs skip DOCA-OFED entirely. Both use inbox rdma-core userspace.
+elif [[ "$(sku_network_mode)" == "no_rdma" ]]; then
+    # Non-IB SKUs skip DOCA-OFED. Use inbox HPC-X with distro RDMA userspace.
     hpcx_metadata=$(get_component_config "hpcx_inbox")
 else
     hpcx_metadata=$(get_component_config "hpcx")
@@ -277,12 +276,6 @@ EOF
 
 #IntelMPI-v2021
 if [[ "$ARCHITECTURE" != "aarch64" ]]; then
-    IMPI_UCX_EXTRAS=""
-    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
-        # The inbox RDMA stack has no system UCX, but Intel's mlx provider requires it.
-        IMPI_UCX_EXTRAS="prepend-path    LD_LIBRARY_PATH ${UCX_PATH}/lib"
-    fi
-
     cat << EOF >> ${MPI_MODULE_FILES_DIRECTORY}/impi_${impi_2021_version}
 #%Module 1.0
 #
@@ -290,7 +283,6 @@ if [[ "$ARCHITECTURE" != "aarch64" ]]; then
 #
 conflict        mpi
 module load /opt/intel/oneapi/mpi/${impi_2021_version}/etc/modulefiles/impi/${impi_2021_version}
-${IMPI_UCX_EXTRAS}
 setenv          MPI_BIN         /opt/intel/oneapi/mpi/${impi_2021_version}/bin
 setenv          MPI_INCLUDE     /opt/intel/oneapi/mpi/${impi_2021_version}/include
 setenv          MPI_LIB         /opt/intel/oneapi/mpi/${impi_2021_version}/lib

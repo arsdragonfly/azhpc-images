@@ -33,13 +33,7 @@ cat <<EOF >/usr/sbin/azure_persistent_rdma_naming.sh
 
 rdma_rename=/usr/sbin/rdma_rename_${RDMA_CORE_VERSION}
 
-# Canonical's kernel-only DOCA-OFED package does not ship NVIDIA's userspace
-# helpers. Enumerating sysfs also works with the NVIDIA userspace stack.
-all_devices=()
-for device_path in /sys/class/infiniband/*; do
-	[[ -e "\$device_path" ]] || continue
-	all_devices+=("\${device_path##*/}")
-done
+mapfile -t all_devices < <(ibdev2netdev -v | sort -n | awk '{print \$2}')
 
 next_index() {
 	local prefix=\$1
@@ -87,15 +81,10 @@ done
 EOF
 chmod 755 /usr/sbin/azure_persistent_rdma_naming.sh
 
-rdma_naming_after="network.target systemd-udev-settle.service"
-if [[ "${DISTRIBUTION}" != "ubuntu26.04" ]]; then
-	rdma_naming_after+=" openibd.service"
-fi
-
 cat <<EOF >/etc/systemd/system/azure_persistent_rdma_naming.service
 [Unit]
 Description=Azure persistent RDMA naming
-After=${rdma_naming_after}
+After=network.target systemd-udev-settle.service openibd.service
 Wants=systemd-udev-settle.service
 
 [Service]

@@ -6,8 +6,32 @@ source ${UTILS_DIR}/utilities.sh
 doca_metadata=$(get_component_config "doca")
 DOCA_VERSION=$(jq -r '.version' <<< "$doca_metadata")
 
+configure_openibd_service() {
+    # Add restart on failure and ensure openibd starts after udev settles.
+    mkdir -p /etc/systemd/system/openibd.service.d
+    cat > /etc/systemd/system/openibd.service.d/override.conf <<EOF
+[Unit]
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Restart=on-failure
+RestartSec=5
+EOF
+
+    if ! sku_uses_ipoib; then
+        echo -e "\n# Load IPoIB\nIPOIB_LOAD=no" | sudo tee -a /etc/infiniband/openib.conf
+    fi
+
+    # Enable only; do not restart at build time. Restarting openibd here probes
+    # the build VM's IB hardware, which may be absent on general-purpose SKUs.
+    systemctl daemon-reload
+    systemctl enable openibd
+}
+
 # Canonical publishes ABI-tracking DOCA-OFED modules for the Azure kernel on
-# Resolute. Use those signed prebuilt modules rather than compiling DKMS.
+# Resolute. Pair those signed modules with NVIDIA's userspace-only DOCA-OFED
+# profile rather than compiling any OFED modules with DKMS.
 if [[ "${DISTRIBUTION}" == "ubuntu26.04" ]]; then
     DOCA_PACKAGE=$(jq -r '.package' <<< "$doca_metadata")
     if [[ -z "$DOCA_PACKAGE" || "$DOCA_PACKAGE" == "null" ]]; then
@@ -15,23 +39,33 @@ if [[ "${DISTRIBUTION}" == "ubuntu26.04" ]]; then
         exit 1
     fi
 
+    DOCA_URL=$(jq -r '.url' <<< "$doca_metadata")
+    DOCA_SHA256=$(jq -r '.sha256' <<< "$doca_metadata")
+    download_and_verify "$DOCA_URL" "$DOCA_SHA256"
+    DOCA_FILE=$(basename "$DOCA_URL")
+    dpkg -i "$DOCA_FILE"
+
     if command -v add-apt-repository >/dev/null 2>&1; then
         add-apt-repository -y universe
     fi
     apt-get update
     apt-get install -y --no-install-recommends \
         "$DOCA_PACKAGE" \
-        rdma-core ibverbs-utils ibverbs-providers infiniband-diags perftest \
-        libibverbs-dev libibumad-dev librdmacm-dev libibmad-dev
+        doca-ofed-userspace
 
-    if dpkg-query -W -f='${db:Status-Abbrev}' doca-ofed-26.01-dkms 2>/dev/null | grep -q '^ii'; then
-        echo "ERROR: doca-ofed-26.01-dkms was installed with the prebuilt DOCA-OFED stack" >&2
-        exit 1
-    fi
+    for dkms_package in \
+        doca-ofed-26.01-dkms mlnx-ofed-kernel-dkms \
+        iser-dkms isert-dkms srp-dkms xpmem-dkms kernel-mft-dkms; do
+        if dpkg-query -W -f='${db:Status-Abbrev}' "$dkms_package" 2>/dev/null | grep -q '^ii'; then
+            echo "ERROR: $dkms_package was installed with the prebuilt DOCA-OFED stack" >&2
+            exit 1
+        fi
+    done
 
-    DOCA_OFED_VERSION=$(dpkg-query -W -f='${Version}' "$DOCA_PACKAGE")
+    DOCA_OFED_VERSION=$(ofed_info -n)
     write_component_version "DOCA" "$DOCA_VERSION"
     write_component_version "OFED" "${DOCA_OFED_VERSION}"
+    configure_openibd_service
     exit 0
 fi
 
@@ -201,25 +235,4 @@ write_component_version "DOCA" $DOCA_VERSION
 OFED_VERSION=$(ofed_info | sed -n '1,1p' | awk -F'-' 'OFS="-" {print $3,$4}' | tr -d ':')
 write_component_version "OFED" $OFED_VERSION
 
-# Create systemd drop-in configuration for openibd.service
-# This adds restart on failure and ensures it starts after udev settles
-mkdir -p /etc/systemd/system/openibd.service.d
-cat > /etc/systemd/system/openibd.service.d/override.conf <<EOF
-[Unit]
-After=systemd-udev-settle.service
-Wants=systemd-udev-settle.service
-
-[Service]
-Restart=on-failure
-RestartSec=5
-EOF
-
-if ! sku_uses_ipoib; then
-    echo -e "\n# Load IPoIB\nIPOIB_LOAD=no" | sudo tee -a /etc/infiniband/openib.conf
-fi
-
-# Enable only; do not restart at build time. Restarting openibd here probes
-# the build VM's IB hardware (which may be absent on general-purpose build
-# SKUs) and is not required before possible tests post-reboot.
-systemctl daemon-reload
-systemctl enable openibd
+configure_openibd_service
