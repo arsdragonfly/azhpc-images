@@ -27,7 +27,7 @@ EOF
     apt update
 }
 
-if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
+if azl_uses_pmc_drivers; then
     if [ "$SKU" = "V100" ]; then
         # V100 requires proprietary kernel modules
         AL3_GPU_DRIVER_PACKAGES="cuda"
@@ -57,6 +57,22 @@ if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
 
     # Keep later DNF operations from moving the PMC-installed driver family.
     dnf_pin_packages "${AL3_GPU_DRIVER_PACKAGES}"
+elif is_azl_dkms_enabled && [[ "$SKU" != "V100" ]]; then
+    # Open kernel module SKUs on Azure Linux (DKMS mode): install directly from cuda-azl3.
+    NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
+    dnf install -y \
+        "nvidia-open-${NVIDIA_DRIVER_VERSION}" \
+        "kmod-nvidia-open-dkms-${NVIDIA_DRIVER_VERSION}"
+    check_dkms_status nvidia
+    dnf_pin_packages \
+        "nvidia-open*" \
+        "kmod-nvidia*" \
+        "nvidia-driver*" \
+        "nvidia-kmod*" \
+        "nvidia-modprobe*" \
+        "nvidia-persistenced*" \
+        "libnvidia-*"
+    echo 'options nvidia NVreg_RestrictProfilingToAdminUsers=0' | tee /etc/modprobe.d/nvprofiling.conf
 elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     # APT-based NVIDIA driver installation for Ubuntu
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
@@ -100,10 +116,10 @@ elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     # written below and via the openibd ExecStartPost drop-in installed by
     # setup_sku_customizations.sh.
 else
-    # RHEL-family: AlmaLinux, Rocky Linux, RHEL - .run file installation
+    # RHEL-family (AlmaLinux, Rocky Linux, RHEL) and Azure Linux V100 DKMS fallback - .run file installation
     NVIDIA_DRIVER_VERSION=$(jq -r '.driver.version' <<< $nvidia_metadata)
     NVIDIA_DRIVER_SHA256=$(jq -r '.driver.sha256' <<< $nvidia_metadata)
-    NVIDIA_DRIVER_URL=https://us.download.nvidia.com/tesla/${NVIDIA_DRIVER_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_DRIVER_VERSION}.run
+    NVIDIA_DRIVER_URL=https://us.download.nvidia.com/tesla/${NVIDIA_DRIVER_VERSION}/NVIDIA-Linux-${ARCHITECTURE}-${NVIDIA_DRIVER_VERSION}.run
     CUDA_DRIVER_DISTRIBUTION=$(jq -r '.driver.distribution' <<< $cuda_metadata)
 
     if [ "$SKU" = "V100" ]; then
@@ -113,9 +129,10 @@ else
     fi
 
     download_and_verify $NVIDIA_DRIVER_URL ${NVIDIA_DRIVER_SHA256}
-    bash NVIDIA-Linux-x86_64-${NVIDIA_DRIVER_VERSION}.run --silent --dkms --kernel-module-type=${KERNEL_MODULE_TYPE}
-    if [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]] || [[ $DISTRIBUTION == rhel* ]]; then
+    bash NVIDIA-Linux-${ARCHITECTURE}-${NVIDIA_DRIVER_VERSION}.run --silent --dkms --kernel-module-type=${KERNEL_MODULE_TYPE}
+    if [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]] || [[ $DISTRIBUTION == rhel* ]] || is_azl_dkms_enabled; then
         dkms install --no-depmod -m nvidia -v ${NVIDIA_DRIVER_VERSION} -k `uname -r` --force
+        check_dkms_status nvidia
     fi
     # nvidia-peermem is NOT modprobe'd at build time -- see comment in the
     # Ubuntu branch above. The module is queued for first boot via

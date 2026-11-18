@@ -21,7 +21,7 @@ if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
 
     # Read back installed version for the component manifest
     NVIDIA_FABRICMANAGER_VERSION=$(dpkg-query -W -f='${Version}' ${PACKAGE_NAME})
-elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
+elif azl_uses_pmc_drivers; then
     # The NVIDIA CUDA repo (cuda-azl3) ships nvidia-fabricmanager and
     # libnvidia-nscq packages that Provide/Obsolete the identically-named PMC
     # packages, often at a newer version than the Microsoft 1P-signed driver
@@ -43,12 +43,13 @@ elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
                    libnvidia-nscq
     NVIDIA_FABRICMANAGER_VERSION=$(sudo dnf list installed | grep -i nvidia-fabric-manager.x86_64 | sed 's/.*[[:space:]]\([0-9.]*-[0-9]*\)\..*/\1/')
 else
-    # RHEL-family: AlmaLinux, Rocky Linux, RHEL, etc.
+    # RHEL-family (AlmaLinux, Rocky Linux, RHEL) and Azure Linux (AZL_ENABLE_DKMS=true)
     nvidia_fabricmanager_metadata=$(jq -r '.fabricmanager' <<< $nvidia_metadata)
     NVIDIA_FABRICMANAGER_DISTRIBUTION=$(jq -r '.distribution' <<< $nvidia_fabricmanager_metadata)
     NVIDIA_FABRICMANAGER_VERSION=$(jq -r '.version' <<< $nvidia_fabricmanager_metadata)
     NVIDIA_FABRICMANAGER_SHA256=$(jq -r '.sha256' <<< $nvidia_fabricmanager_metadata)
     NVIDIA_FABRICMANAGER_PREFIX=$(echo $NVIDIA_FABRICMANAGER_VERSION | cut -d '.' -f1)
+    CUDA_REPO_ARCH=$([[ "$ARCHITECTURE" == "aarch64" ]] && echo "sbsa" || echo "x86_64")
 
     # For NVIDIA Fabric Manager major version 580, Nvidia dropped the hyphen between fabric and manager
     if [[ $NVIDIA_FABRICMANAGER_PREFIX -ge 580 ]]; then
@@ -56,7 +57,7 @@ else
     else
         PACKAGE_NAME="nvidia-fabric-manager"
     fi
-    NVIDIA_FABRIC_MNGR_PKG=https://developer.download.nvidia.com/compute/cuda/repos/${NVIDIA_FABRICMANAGER_DISTRIBUTION}/x86_64/${PACKAGE_NAME}-${NVIDIA_FABRICMANAGER_VERSION}.x86_64.rpm
+    NVIDIA_FABRIC_MNGR_PKG=https://developer.download.nvidia.com/compute/cuda/repos/${NVIDIA_FABRICMANAGER_DISTRIBUTION}/${CUDA_REPO_ARCH}/${PACKAGE_NAME}-${NVIDIA_FABRICMANAGER_VERSION}.${ARCHITECTURE}.rpm
     FILENAME=$(basename $NVIDIA_FABRIC_MNGR_PKG)
     download_and_verify ${NVIDIA_FABRIC_MNGR_PKG} ${NVIDIA_FABRICMANAGER_SHA256}
     

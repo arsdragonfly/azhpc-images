@@ -9,7 +9,7 @@ rccl_metadata=$(get_component_config "rccl")
 AMD_GPU_TARGETS="gfx90a;gfx942"
 RCCL_TEST_CMAKE_ARGS=(-DGPU_TARGETS="${AMD_GPU_TARGETS}")
 RCCL_TEST_GIT_ARGS=()
-if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
+if [[ $DISTRIBUTION == "ubuntu26.04" ]] || is_azl_dkms_enabled; then
     rocm_metadata=$(get_component_config "rocm")
     rocm_version=$(jq -r '.version' <<< "$rocm_metadata")
     # TODO: AMD upstream needs to provide the missing /opt/rocm/.info link.
@@ -19,10 +19,13 @@ if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
 fi
 
 # Ubuntu 26.04 and Azure Linux 3 use packaged RCCL; build from source on other distros.
-if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
+if [[ $DISTRIBUTION == "ubuntu26.04" ]] || is_azl_dkms_enabled; then
     rccl_version=$(awk -F '"' '/^set\(PACKAGE_VERSION "/ {print $2; exit}' /opt/rocm/lib/cmake/rccl/rccl-config-version.cmake)
     [[ "$rccl_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
     write_component_version "RCCL" "$rccl_version"
+    # Validation telemetry scripts inspect /opt/rccl/lib/librccl.so directly.
+    mkdir -p /opt/rccl
+    ln -sfn /opt/rocm/lib /opt/rccl/lib
 elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
     dnf install -y rccl rccl-devel rccl-unittests
     write_component_version "RCCL" "$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' rccl)"
@@ -106,7 +109,7 @@ mkdir -p $DEST_TEST_DIR
 
 # Sparse-clone only the rccl-tests subproject of rocm-systems to keep the
 # clone small.
-if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
+if [[ $DISTRIBUTION == "ubuntu26.04" ]] || is_azl_dkms_enabled; then
     git clone --depth=1 --filter=blob:none --sparse "${RCCL_TEST_GIT_ARGS[@]}" https://github.com/ROCm/TheRock.git
     rccl_tests_commit=$(git -C TheRock rev-parse HEAD:rocm-systems)
     git init rocm-systems

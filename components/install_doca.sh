@@ -13,6 +13,9 @@ if [[ "$DOCA_SOURCE" == "private" ]]; then
     DOCA_SHA256=$(jq -r '.sha256' <<< $doca_metadata)
     DOCA_FILE="$TOP_DIR/internal_bits/$DOCA_FILE"
     verify_checksum "$DOCA_FILE" "$DOCA_SHA256"
+elif [[ "$DOCA_SOURCE" == "repo" ]]; then
+    DOCA_REPO_URL=$(jq -er '.repo_url' <<< "$doca_metadata")
+    DOCA_GPG_KEY=$(jq -er '.gpg_key' <<< "$doca_metadata")
 else
     DOCA_URL=$(jq -r '.url' <<< $doca_metadata)
     DOCA_SHA256=$(jq -r '.sha256' <<< $doca_metadata)
@@ -234,16 +237,21 @@ PIN
     configure_mlnx_ofed_kernel_dkms_xdp_patch
     apt-get -y install doca-ofed
     check_dkms_status mlnx-ofed-kernel iser isert srp
-elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
-    download_and_verify $DOCA_URL $DOCA_SHA256
-    rpm -i $DOCA_FILE
-    dnf clean all
-    install_hpcx_doca_ofed_deps_rpm_marker
-    dnf -y install doca-ofed
 else
-    download_and_verify $DOCA_URL $DOCA_SHA256
-    # RHEL-family: AlmaLinux, Rocky Linux, RHEL, etc.
-    rpm -i $DOCA_FILE
+    # RPM-based distros: AlmaLinux, Rocky Linux, RHEL, Azure Linux (AZL_ENABLE_DKMS=true)
+    if [[ "$DOCA_SOURCE" == "repo" ]]; then
+        cat > /etc/yum.repos.d/doca.repo <<EOF
+[doca]
+name=NVIDIA DOCA ${DOCA_VERSION} Repository
+baseurl=${DOCA_REPO_URL}
+enabled=1
+gpgcheck=1
+gpgkey=${DOCA_GPG_KEY}
+excludepkgs=dkms
+EOF
+    else
+        rpm -i "$DOCA_FILE"
+    fi
     dnf clean all
 
     # Backup
@@ -279,25 +287,29 @@ else
         echo "ERROR: no packages found from doca* repos after doca-ofed install" >&2
         exit 1
     fi
-    baseos_repo=baseos
+    base_repos=(baseos)
     if [[ $DISTRIBUTION == rhel* ]]; then
         rhel_version=${DISTRIBUTION#rhel}
-        baseos_repo=rhel-${rhel_version%%.*}-for-${ARCHITECTURE}-baseos-rhui-rpms
+        base_repos=("rhel-${rhel_version%%.*}-for-${ARCHITECTURE}-baseos-rhui-rpms")
+    elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
+        base_repos=(azurelinux-official-base azurelinux-official-extended)
     fi
-    mapfile -t baseos_pkgs < <(
-        dnf repoquery --quiet --repo="${baseos_repo}" --qf '%{name}\n' '*' | sort -u
-    )
-    mapfile -t baseos_conflicts < <(
-        comm -12 \
-            <(printf '%s\n' "${doca_pkgs[@]}") \
-            <(printf '%s\n' "${baseos_pkgs[@]}")
-    )
-    if [[ ${#baseos_conflicts[@]} -gt 0 ]]; then
-        echo "Pinning ${#baseos_conflicts[@]} baseos package(s) shadowed by DOCA: ${baseos_conflicts[*]}"
-        dnf config-manager --save \
-            --setopt="${baseos_repo}.excludepkgs=${baseos_conflicts[*]}" \
-            >/dev/null
-    fi
+    for baseos_repo in "${base_repos[@]}"; do
+        mapfile -t baseos_pkgs < <(
+            dnf repoquery --quiet --repo="${baseos_repo}" --qf '%{name}\n' '*' 2>/dev/null | sort -u
+        )
+        mapfile -t baseos_conflicts < <(
+            comm -12 \
+                <(printf '%s\n' "${doca_pkgs[@]}") \
+                <(printf '%s\n' "${baseos_pkgs[@]}")
+        )
+        if [[ ${#baseos_conflicts[@]} -gt 0 ]]; then
+            echo "Pinning ${#baseos_conflicts[@]} ${baseos_repo} package(s) shadowed by DOCA: ${baseos_conflicts[*]}"
+            dnf config-manager --save \
+                --setopt="${baseos_repo}.excludepkgs=${baseos_conflicts[*]}" \
+                >/dev/null
+        fi
+    done
 fi
 
 write_component_version "DOCA" $DOCA_VERSION

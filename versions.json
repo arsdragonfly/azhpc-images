@@ -90,6 +90,20 @@
                 "sha256": "97d2ff3f271bd7e324e2c25b17ac12fb22e91be3e8a4bdf50a399ced1e5a7bc9",
                 "url": "https://www.mellanox.com/downloads/DOCA/DOCA_v3.2.2/host/doca-host-3.2.2-035000_25.10_rhel9.x86_64.rpm"
             }
+        },
+        "azurelinux3.0": {
+            "x86_64": {
+                "version": "3.3.0",
+                "source": "repo",
+                "repo_url": "https://linux.mellanox.com/public/repo/doca/3.3.0/azurelinux3.0/x86_64/",
+                "gpg_key": "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
+            },
+            "aarch64": {
+                "version": "3.3.0",
+                "source": "repo",
+                "repo_url": "https://linux.mellanox.com/public/repo/doca/3.3.0/azurelinux3.0/arm64-sbsa/",
+                "gpg_key": "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
+            }
         }
     },
     "hpcx": {
@@ -273,6 +287,11 @@
         },
         "azurelinux3.0": {
             "x86_64": {
+                "azl_dkms": {
+                    "version": "2.51",
+                    "sha256": "75131ed5bcf4fc0ddaa372ca10a572d37f70f79b9f9f9903983f34258fa92810",
+                    "url": "https://content.mellanox.com/hpc/hpc-x/v2.51_cuda13/hpcx-v2.51-gcc-doca_ofed-redhat9-cuda13-x86_64.tbz"
+                },
                 "version": "2.18",
                 "sha256": "45276ff7bd676cc668d1cc6a1fe926d5e157646aaf06201415e0aadb048be16d",
                 "url": "https://content.mellanox.com/hpc/hpc-x/v2.18/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64.tbz"
@@ -508,7 +527,21 @@
             }
         },
         "azurelinux3.0": {
+            "x86_64": {
+                "driver": {
+                    "version": "580.178.04",
+                    "sha256": "5975a86ee45bffcb626f51ae33d1169b108186a2ea47ad651e72f13fa4b6d6f9"
+                },
+                "fabricmanager": {
+                    "distribution": "azl3",
+                    "version": "580.178.04-1.azl3",
+                    "sha256": "389fb28b5290c3227e6fd195525449e12785a735e47da05c412688f81f2fcb69"
+                }
+            },
             "aarch64": {
+                "driver": {
+                    "version": "580.167.08"
+                },
                 "imex": {
                     "version": "580.159.04"
                 }
@@ -850,14 +883,14 @@
         },
         "azurelinux3.0": {
             "x86_64": {
-                "version": "2.5.1-1",
-                "sha256": "9f1ddefaf7ebf09f1f4cb04873ed9fb255ddfd819ab1cf5ec2e73ed96140565a",
-                "distribution": "azl3"
+                "version": "2.6-1",
+                "commit": "93c606bbcaa10457cbbab93163aa446d902b983d",
+                "distribution": "azurelinux-3.0"
             },
             "aarch64": {
-                "version": "2.5.1-1",
-                "sha256": "9f1ddefaf7ebf09f1f4cb04873ed9fb255ddfd819ab1cf5ec2e73ed96140565a",
-                "distribution": "azl3"
+                "version": "2.6-1",
+                "commit": "93c606bbcaa10457cbbab93163aa446d902b983d",
+                "distribution": "azurelinux-3.0"
             }
         },
         "rocky8.10": {
@@ -1141,6 +1174,11 @@
             "x86_64": {
                 "version": "31.50"
             }
+        },
+        "azurelinux3.0": {
+            "x86_64": {
+                "version": "31.50"
+            }
         }
     },
     "rocm": {
@@ -1165,6 +1203,9 @@
         },
         "azurelinux3.0": {
             "x86_64": {
+                "azl_dkms": {
+                    "version": "10.0"
+                },
                 "version": "7.0.3"
             }
         },

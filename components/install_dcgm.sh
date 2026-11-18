@@ -196,7 +196,19 @@ EOF
         rpm -Uvh --replacepkgs "${marker_rpm}"
         rm -rf "${rpm_topdir}"
     fi
-    if [ "$1" = "V100" ]; then
+    if is_azl_dkms_enabled; then
+        dnf clean expire-cache
+        dnf install -y --setopt=install_weak_deps=True \
+            datacenter-gpu-manager-4-cuda${CUDA_VERSION}-${DCGM_VERSION} \
+            datacenter-gpu-manager-4-multinode-${DCGM_VERSION} \
+            datacenter-gpu-manager-4-multinode-cuda${CUDA_VERSION}-${DCGM_VERSION}
+        if [[ "${SKU_CUDA_VERSION}" -lt "${CUDA_VERSION}" ]]; then
+            echo "Installing DCGM packages for SKU-specific CUDA ${SKU_CUDA_VERSION}"
+            dnf install -y --setopt=install_weak_deps=True \
+                datacenter-gpu-manager-4-cuda${SKU_CUDA_VERSION}-${DCGM_VERSION} \
+                datacenter-gpu-manager-4-multinode-cuda${SKU_CUDA_VERSION}-${DCGM_VERSION}
+        fi
+    elif [ "$1" = "V100" ]; then
         dnf install -y \
             datacenter-gpu-manager-4-cuda12-${DCGM_VERSION} \
             datacenter-gpu-manager-4-multinode-${DCGM_VERSION} \

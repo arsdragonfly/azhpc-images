@@ -24,6 +24,7 @@ export ARCHITECTURE=$(uname -m)
 # Baremetal_3P callers must set TARGET_NODE_TYPE=baremetal_3p in their environment
 # before sourcing this script.
 export TARGET_NODE_TYPE="${TARGET_NODE_TYPE:-azure_vm_regular}"
+export AZL_ENABLE_DKMS="${AZL_ENABLE_DKMS:-false}"
 
 # Derive SKU_FAMILY from SKU so all downstream scripts use a single canonical
 # GPU-family identifier instead of repeated per-SKU string comparisons.

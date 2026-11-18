@@ -23,7 +23,7 @@ if [[ "$TARGET_NODE_TYPE" == "azure_vm_akshost" ]]; then
         write_component_version "GDRCOPY" ${GDRCOPY_VERSION}
     fi
 else    
-    if [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
+    if azl_uses_pmc_drivers; then
         kernel_version=$(uname -r | sed 's/\-/./g')
         kernel_version=${kernel_version%.*}
 
@@ -67,6 +67,16 @@ else
             apt-mark hold gdrcopy-tests
             apt install -y ./gdrcopy_${GDRCOPY_VERSION}_${ARCHITECTURE_DISTRO}.${GDRCOPY_DISTRIBUTION}.deb
             apt-mark hold gdrcopy
+        elif is_azl_dkms_enabled; then
+            # Define rhel=9 for gdrcopy.spec so it installs the systemd gdrcopy.service unit
+            # rather than falling back to RHEL8's legacy chkconfig scriptlet.
+            sed -i "s/--define 'dist %{nil}'/--define 'dist %{nil}' --define 'rhel 9'/" build-rpm-packages.sh
+            CUDA=/usr/local/cuda ./build-rpm-packages.sh
+            rpm -Uvh "gdrcopy-kmod-${GDRCOPY_VERSION}dkms.${GDRCOPY_DISTRIBUTION}.noarch.rpm"
+            rpm -Uvh "gdrcopy-${GDRCOPY_VERSION}.${GDRCOPY_DISTRIBUTION}.${ARCHITECTURE}.rpm"
+            rpm -Uvh "gdrcopy-devel-${GDRCOPY_VERSION}.${GDRCOPY_DISTRIBUTION}.noarch.rpm"
+            check_dkms_status gdrdrv
+            dnf_pin_packages "gdrcopy*"
         elif [[ $DISTRIBUTION == almalinux* ]] || [[ $DISTRIBUTION == rocky* ]] || [[ $DISTRIBUTION == rhel* ]]; then
             nvidia_metadata=$(get_component_config "nvidia")
             nvidia_driver_metadata=$(jq -r '.driver' <<< $nvidia_metadata)

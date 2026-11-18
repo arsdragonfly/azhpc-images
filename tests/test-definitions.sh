@@ -370,7 +370,7 @@ function verify_rocm_installation {
     check_exists "/opt/rocm/"
 
     local rocm_prefix=/opt/rocm
-    if [[ "$DISTRIBUTION" == "ubuntu26.04" ]]; then
+    if [[ -f /opt/rocm/core/.info/version ]]; then
         rocm_prefix=/opt/rocm/core
     fi
     amd_rocm_version=$(cat "$rocm_prefix/.info/version")

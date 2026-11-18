@@ -201,17 +201,24 @@ install_ubuntu_nvidia_kernel() {
 # @RetVal       : 0 on success
 ####
 configure_ofed_dkms_build_depends() {
-    [[ -d /var/lib/dkms/mlnx-ofed-kernel ]] || return 0
+    local ofed_dkms_module=""
+    if [[ -d /var/lib/dkms/mlnx-ofed-kernel ]]; then
+        ofed_dkms_module="mlnx-ofed-kernel"
+    elif [[ -d /var/lib/dkms/mlnx-ofa_kernel ]]; then
+        ofed_dkms_module="mlnx-ofa_kernel"
+    else
+        return 0
+    fi
     mkdir -p /etc/dkms
 
-    cat > /etc/dkms/iser.conf <<'EOF'
-BUILD_DEPENDS="mlnx-ofed-kernel"
+    cat > /etc/dkms/iser.conf <<EOF
+BUILD_DEPENDS="${ofed_dkms_module}"
 EOF
-    cat > /etc/dkms/isert.conf <<'EOF'
-BUILD_DEPENDS="mlnx-ofed-kernel"
+    cat > /etc/dkms/isert.conf <<EOF
+BUILD_DEPENDS="${ofed_dkms_module}"
 EOF
-    cat > /etc/dkms/srp.conf <<'EOF'
-BUILD_DEPENDS="mlnx-ofed-kernel"
+    cat > /etc/dkms/srp.conf <<EOF
+BUILD_DEPENDS="${ofed_dkms_module}"
 EOF
 }
 
@@ -533,12 +540,22 @@ update_rhel_packages() {
         dnf --disablerepo='*' --enablerepo='rhui-microsoft-*' update -y 'rhui*'
     fi
     
+    configure_ofed_dkms_build_depends
     dnf update -y --refresh
     dnf install -y git
     
     if [[ "${os_family}" == "azurelinux"* ]]; then
         echo "Configuring Azure Linux specific settings..."
-        sed -i 's/lockdown=integrity /lockdown=integrity ipv6.disable=1/' /etc/default/grub
+        if [[ "${AZL_ENABLE_DKMS:-false}" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
+            sed -i -E 's/\<lockdown=integrity\>[[:space:]]*//g' /etc/default/grub
+        fi
+        if ! grep -qE '^GRUB_CMDLINE_LINUX=.*\<ipv6\.disable=1\>' /etc/default/grub; then
+            if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub; then
+                sed -i -E '/^GRUB_CMDLINE_LINUX=/ { s/"$/ ipv6.disable=1"/; s/=" /="/ }' /etc/default/grub
+            else
+                echo 'GRUB_CMDLINE_LINUX="ipv6.disable=1"' >> /etc/default/grub
+            fi
+        fi
         grub2-mkconfig -o /boot/grub2/grub.cfg
         sed -i '/umask 007/d' /etc/profile
     fi

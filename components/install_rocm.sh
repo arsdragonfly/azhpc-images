@@ -115,6 +115,48 @@ elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     fi
     apt install -y rocm-bandwidth-test
     rm -f ./${DEBPACKAGE}
+elif is_azl_dkms_enabled; then
+    driver_metadata=$(get_component_config "amdgpu")
+    driver_version=$(jq -er '.version' <<< "$driver_metadata")
+    rocm_package="amdrocm-core-sdk${rocm_version}"
+
+    cat > /etc/yum.repos.d/amdgpu.repo <<EOF
+[amdgpu]
+name=AMDGPU ${driver_version} repository
+baseurl=https://repo.radeon.com/amdgpu/${driver_version}/el/9.8/main/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
+EOF
+    cat > /etc/yum.repos.d/amdrocm-stable.repo <<EOF
+[amdrocm-stable]
+name=AMD ROCm core repository for Azure Linux 3
+baseurl=https://stable.repo.amd.com/rocm/core/packages/azl3/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=https://stable.repo.amd.com/rocm/gpg/packages.gpg
+EOF
+    cat > /etc/yum.repos.d/amdrocm-rvs.repo <<EOF
+[amdrocm-rvs]
+name=AMD ROCm RVS repository for Azure Linux 3
+baseurl=https://stable.repo.amd.com/rocm/extras/rvs/packages/azl3/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=https://stable.repo.amd.com/rocm/gpg/packages.gpg
+EOF
+
+    dnf repolist --refresh
+    configure_amdgpu_dkms_patches
+    dnf install -y amdgpu-dkms amdgpu-dkms-firmware
+    check_dkms_status amdgpu
+    dnf install -y "$rocm_package" amdrocm10-rvs
+    rocm_version=$(cat /opt/rocm/core/.info/version)
+    write_component_version "AMDGPU" "$(rpm -q --qf '%{VERSION}-%{RELEASE}' amdgpu-dkms)"
+    rvs_version=$(rpm -q --qf '%{VERSION}-%{RELEASE}' amdrocm10-rvs)
+    write_component_version "RVS" "$rvs_version"
+
+    echo /opt/rocm/lib > /etc/ld.so.conf.d/rocm.conf
+    ldconfig
 elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
     dnf install -y azurelinux-repos-amd
     dnf -y install kernel-drivers-gpu-$(uname -r)
@@ -149,6 +191,9 @@ write_component_version "ROCM" ${rocm_version}
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     echo blacklist amdgpu | tee -a /etc/modprobe.d/blacklist.conf
     update-initramfs -c -k $(uname -r)
+elif is_azl_dkms_enabled; then
+    echo blacklist amdgpu | tee -a /etc/modprobe.d/blacklist.conf
+    dracut --force
 fi
 
 #1002:740c is Mi200

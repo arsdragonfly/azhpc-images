@@ -17,15 +17,23 @@ fi
 
 # Install Kernel dependencies
 if [ "$ARCHITECTURE" = "aarch64" ]; then
-    dnf install -y kernel-hwe-devel-$(uname -r) \
-                kernel-hwe-drivers-gpu-$(uname -r) \
-                kernel-headers
-
+    kernel_pkgs=(
+        "kernel-hwe-devel-$(uname -r)"
+        "kernel-headers"
+    )
+    if azl_uses_pmc_drivers; then
+        kernel_pkgs+=("kernel-hwe-drivers-gpu-$(uname -r)")
+    fi
+    dnf install -y "${kernel_pkgs[@]}"
 else
-    dnf install -y kernel-headers-$(uname -r) \
-                kernel-devel-$(uname -r) \
-                kernel-drivers-gpu-$(uname -r) \
-                dkms
+    kernel_pkgs=(
+        "kernel-headers-$(uname -r)"
+        "kernel-devel-$(uname -r)"
+    )
+    if azl_uses_pmc_drivers; then
+        kernel_pkgs+=("kernel-drivers-gpu-$(uname -r)" "dkms")
+    fi
+    dnf install -y "${kernel_pkgs[@]}"
 fi
 
 # Install Python 3.12
@@ -77,6 +85,14 @@ dnf install -y numactl \
     check-devel \
     lsof \
     azurelinux-rpm-macros \
+    autoconf \
+    automake \
+    flex \
+    gcc-c++ \
+    libmnl-devel \
+    mokutil \
+    openssl-devel \
+    pciutils-devel \
     tcsh \
     gcc-gfortran \
     perl \
@@ -102,7 +118,19 @@ sed -i 's/^\#kern\.\*.*/kern\.\*                                \-\/var\/log\/ke
 sed -i 's#/var/log/maillog#/var/log/maillog\n/var/log/kern.log#' /etc/logrotate.d/rsyslog
 
 ## Install dkms
-dnf install -y dkms
+if is_azl_dkms_enabled; then
+    if grep -q '\<lockdown=integrity\>' /etc/default/grub; then
+        sed -i -E 's/\<lockdown=integrity\>[[:space:]]*//g' /etc/default/grub
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+    fi
+    $COMPONENT_DIR/install_cuda_repo_and_dkms.sh
+    if sku_uses_ipoib; then
+        echo ib_ipoib | tee /etc/modules-load.d/ib_ipoib.conf
+    fi
+    echo ib_umad | tee /etc/modules-load.d/ib_umad.conf
+else
+    dnf install -y dkms
+fi
 
 ## Install subunit and subunit-devel
 dnf install -y subunit

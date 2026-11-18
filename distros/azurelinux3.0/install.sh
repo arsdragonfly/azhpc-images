@@ -22,8 +22,14 @@ source ../../utils/set_properties.sh
 # install utils
 ./install_utils.sh
 
-# install Mellanox OFED
-$COMPONENT_DIR/install_mofed.sh
+# install OFED (DOCA-OFED via DKMS when AZL_ENABLE_DKMS=true, otherwise PMC MOFED)
+if is_azl_dkms_enabled; then
+    if [[ "$(sku_network_mode)" != "no_rdma" ]]; then
+        $COMPONENT_DIR/install_doca.sh
+    fi
+else
+    $COMPONENT_DIR/install_mofed.sh
+fi
 
 if [ "$GPU" = "AMD" ]; then
     # Install ROCm before MPI so HPC-X can rebuild UCX with ROCm support.

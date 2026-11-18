@@ -49,8 +49,23 @@ get_component_config(){
     if [[ "$config" = "null" ]]; then
         config=$(jq -r '."'"${component}"'".common' <<< "${COMPONENT_VERSIONS}")
     fi
+
+    if is_azl_dkms_enabled && [[ "$config" != "null" ]]; then
+        azl_dkms_config=$(jq -r '.azl_dkms // "null"' <<< "$config")
+        if [[ "$azl_dkms_config" != "null" ]]; then
+            config="$azl_dkms_config"
+        fi
+    fi
     
     echo "$config"
+}
+
+is_azl_dkms_enabled() {
+    [[ "${DISTRIBUTION:-}" == azurelinux* && "${AZL_ENABLE_DKMS:-false}" =~ ^[Tt][Rr][Uu][Ee]$ ]]
+}
+
+azl_uses_pmc_drivers() {
+    [[ "${DISTRIBUTION:-}" == "azurelinux3.0" ]] && ! is_azl_dkms_enabled
 }
 
 ############################################################################

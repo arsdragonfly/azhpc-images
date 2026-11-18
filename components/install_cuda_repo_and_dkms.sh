@@ -5,8 +5,14 @@ source ${UTILS_DIR}/utilities.sh
 
 case "${DISTRIBUTION}" in
     ubuntu22.04|ubuntu24.04|ubuntu26.04) ;;
+    azurelinux3.0)
+        if ! is_azl_dkms_enabled; then
+            echo "ERROR: CUDA repository DKMS setup on Azure Linux requires AZL_ENABLE_DKMS=true." >&2
+            exit 1
+        fi
+        ;;
     *)
-        echo "ERROR: CUDA APT repository setup is only supported on Ubuntu." >&2
+        echo "ERROR: CUDA repository DKMS setup is only supported on Ubuntu and Azure Linux (AZL_ENABLE_DKMS=true)." >&2
         exit 1
         ;;
 esac
@@ -26,13 +32,14 @@ if ! CUDA_DRIVER_DISTRIBUTION=$(jq -er '.driver.distribution | strings | select(
     exit 1
 fi
 
-CUDA_KEYRING_DEB=cuda-keyring_1.1-1_all.deb
-curl -fsSL --retry 3 -o "${CUDA_KEYRING_DEB}" \
-    "https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/${CUDA_KEYRING_DEB}"
-apt-get install -y "./${CUDA_KEYRING_DEB}"
-rm -f "${CUDA_KEYRING_DEB}"
+if [[ "${DISTRIBUTION}" == *"ubuntu"* ]]; then
+    CUDA_KEYRING_DEB=cuda-keyring_1.1-1_all.deb
+    curl -fsSL --retry 3 -o "${CUDA_KEYRING_DEB}" \
+        "https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/${CUDA_KEYRING_DEB}"
+    apt-get install -y "./${CUDA_KEYRING_DEB}"
+    rm -f "${CUDA_KEYRING_DEB}"
 
-cat > /etc/apt/preferences.d/cuda-dkms-pin <<'EOF'
+    cat > /etc/apt/preferences.d/cuda-dkms-pin <<'EOF'
 # NVIDIA's prebuilt DKMS is more up-to-date than Ubuntu's and DOCA's copies.
 # Prefer its latest version for /etc/dkms patch overlays and rebuild fixes.
 Package: dkms
@@ -40,8 +47,8 @@ Pin: release l=NVIDIA CUDA
 Pin-Priority: 700
 EOF
 
-if [[ "${GPU}" == "AMD" ]]; then
-    cat >> /etc/apt/preferences.d/cuda-dkms-pin <<'EOF'
+    if [[ "${GPU}" == "AMD" ]]; then
+        cat >> /etc/apt/preferences.d/cuda-dkms-pin <<'EOF'
 
 # AMD images use only DKMS from this repository. Keep its exception above
 # this per-package regex, which overrides cuda-keyring's generic priority 600.
@@ -50,7 +57,29 @@ Package: /.+/
 Pin: release l=NVIDIA CUDA
 Pin-Priority: -1
 EOF
-fi
+    fi
 
-apt-get update
-apt-get install -y dkms
+    apt-get update
+    apt-get install -y dkms
+else
+    CUDA_DRIVER_VERSION=$(jq -r '.driver.version' <<< "${cuda_metadata}")
+    CUDA_REPO_ID="cuda-${CUDA_DRIVER_DISTRIBUTION}-${CUDA_ARCHITECTURE}"
+    dnf config-manager --add-repo \
+        "https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DRIVER_DISTRIBUTION}/${CUDA_ARCHITECTURE}/cuda-${CUDA_DRIVER_DISTRIBUTION}.repo"
+
+    if [[ "${GPU}" == "AMD" ]]; then
+        dnf config-manager --save \
+            --setopt="${CUDA_REPO_ID}.includepkgs=dkms" >/dev/null
+    else
+        cuda_excludes="mft* kernel-mft*"
+        if [[ "${CUDA_DRIVER_VERSION}" == 12.* ]]; then
+            cuda_excludes="${cuda_excludes} cccl-*"
+        fi
+        dnf config-manager --save \
+            --setopt="${CUDA_REPO_ID}.excludepkgs=${cuda_excludes}" >/dev/null
+    fi
+
+    dnf clean expire-cache
+    dnf install -y --enablerepo="${CUDA_REPO_ID}" dkms
+    dnf_pin_packages "dkms"
+fi

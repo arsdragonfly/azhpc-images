@@ -649,6 +649,15 @@ locals {
   azl_base_image_type = coalesce(var.azl_base_image_type, "Marketplace-Non-FIPS")
 }
 
+variable "azl_enable_dkms" {
+  type        = string
+  description = "Enable DKMS-based vendor drivers on Azure Linux (disables lockdown=integrity in GRUB)"
+  default     = env("AZL_ENABLE_DKMS")
+}
+locals {
+  azl_enable_dkms = local.os_family == "azurelinux" && try(convert(lower(var.azl_enable_dkms), bool), false)
+}
+
 # =============================================================================
 # GB200 Specific Variables
 # =============================================================================

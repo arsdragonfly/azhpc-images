@@ -138,6 +138,7 @@ build {
       "UBUNTU_PPA_REPO_NAME=${var.ubuntu_ppa_repo_name}",
       "UBUNTU_PPA_KERNEL_PATCH_VERSION=${var.ubuntu_ppa_kernel_patch_version}",
       "GB200_PARTUUID=${var.gb200_partuuid}",
+      "AZL_ENABLE_DKMS=${local.azl_enable_dkms}",
       "REFRESH_MODE=${local.refresh_mode}",
       "DEBIAN_FRONTEND=noninteractive"
     ]
@@ -268,6 +269,7 @@ build {
       "TARGET_NODE_TYPE=${local.target_node_type}",
       "NVLINK_RACKSCALE=${local.nvlink_rackscale}",
       "KERNEL_VERSION=${local.kernel_version}",
+      "AZL_ENABLE_DKMS=${local.azl_enable_dkms}",
       "REFRESH_MODE=${local.refresh_mode}",
     ]
     inline = [
@@ -304,6 +306,7 @@ build {
       "GPU=${local.gpu_platform}",
       "GPU_SKU=${local.gpu_sku}",
       "TARGET_NODE_TYPE=${local.target_node_type}",
+      "AZL_ENABLE_DKMS=${local.azl_enable_dkms}",
       "REFRESH_MODE=${local.refresh_mode}",
     ]
     # Generic hook for one-off in-place-refresh fix-ups (e.g. disabling a

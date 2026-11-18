@@ -171,8 +171,14 @@ fi
 
 if [[ $DISTRIBUTION == "azurelinux3.0" && "$SKU" == "GB200" ]]; then
     # Grub kernel cmdline options needed for Arm64 GB200 and above SKUs in HPC test images
-    sudo sed -i 's/lockdown=integrity/lockdown=integrity efi_mmap_nr_slack_slots=256 numa_balancing=disable iommu.passthrough=1 irqchip.gicv3_nolpi=y arm_smmu_v3.disable_msipolling=1 init_on_alloc=0 nvme_core.io_timeout=240 panic=-1/' /etc/default/grub
-    sudo sed -i 's/lockdown=integrity/lockdown=integrity efi_mmap_nr_slack_slots=256 numa_balancing=disable iommu.passthrough=1 irqchip.gicv3_nolpi=y arm_smmu_v3.disable_msipolling=1 init_on_alloc=0 nvme_core.io_timeout=240 panic=-1/' /boot/grub2/grub.cfg
+    gb200_kargs="efi_mmap_nr_slack_slots=256 numa_balancing=disable iommu.passthrough=1 irqchip.gicv3_nolpi=y arm_smmu_v3.disable_msipolling=1 init_on_alloc=0 nvme_core.io_timeout=240 panic=-1"
+    if [[ "${AZL_ENABLE_DKMS:-false}" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
+        sudo sed -i -E 's/\<lockdown=integrity\>[[:space:]]*//g' /etc/default/grub
+    fi
+    if ! grep -q 'efi_mmap_nr_slack_slots=256' /etc/default/grub; then
+        sudo sed -i -E "/^GRUB_CMDLINE_LINUX=/ { s/\"\$/ ${gb200_kargs}\"/; s/=\" /=\"/ }" /etc/default/grub
+    fi
+    sudo grub2-mkconfig -o /boot/grub2/grub.cfg
     # Recommended to disable irqbalance in GB200 images.
     sudo systemctl stop irqbalance
     sudo systemctl disable irqbalance
