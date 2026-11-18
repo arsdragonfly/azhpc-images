@@ -245,6 +245,7 @@ else
 name=NVIDIA DOCA ${DOCA_VERSION} Repository
 baseurl=${DOCA_REPO_URL}
 enabled=1
+priority=10
 gpgcheck=1
 gpgkey=${DOCA_GPG_KEY}
 excludepkgs=dkms
@@ -259,6 +260,19 @@ EOF
     sed -i '/^exclude=/d' /etc/dnf/dnf.conf
     install_hpcx_doca_ofed_deps_rpm_marker
     configure_doca_dkms_patches mlnx-ofa_kernel
+    if [[ "$DOCA_SOURCE" == "repo" ]]; then
+        # Replace any RDMA packages pulled earlier from the distro base repo (e.g. via hwloc-devel)
+        # with the DOCA repository copies so the entire userspace/kernel stack matches.
+        mapfile -t preinstalled_doca_overlap < <(
+            comm -12 \
+                <(dnf repoquery --installed --quiet --qf '%{name} %{from_repo}\n' | awk '$2 !~ /^doca/ {print $1}' | sort -u) \
+                <(dnf repoquery --quiet --repo=doca --qf '%{name}\n' '*' | sort -u)
+        )
+        if [[ ${#preinstalled_doca_overlap[@]} -gt 0 ]]; then
+            dnf -y distro-sync "${preinstalled_doca_overlap[@]}"
+            dnf -y reinstall "${preinstalled_doca_overlap[@]}" || true
+        fi
+    fi
     dnf -y install doca-ofed
     check_dkms_status mlnx-ofa_kernel iser isert srp
     # Restore exclusion
