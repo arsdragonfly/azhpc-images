@@ -81,5 +81,10 @@ else
 
     dnf clean expire-cache
     dnf install -y --enablerepo="${CUDA_REPO_ID}" dkms
+    # cuda-azl3's dkms 3.4+ installs /usr/bin/dkms, whereas DOCA and AMDGPU RPM
+    # scriptlets invoke /usr/sbin/dkms explicitly on Azure Linux's split bin/sbin layout.
+    if [[ ! -e /usr/sbin/dkms && -x /usr/bin/dkms ]]; then
+        ln -s /usr/bin/dkms /usr/sbin/dkms
+    fi
     dnf_pin_packages "dkms"
 fi
