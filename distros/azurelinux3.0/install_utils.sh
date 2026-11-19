@@ -15,23 +15,27 @@ if [[ -f "$tdnf_repogpgcheck_config" ]]; then
     sed -i 's/^enabled=.*/enabled=0/' "$tdnf_repogpgcheck_config"
 fi
 
+# Stop waagent while install.sh runs package transactions so Azure VM extensions
+# (e.g. AADSSHLoginForLinux / MDE) cannot invoke tdnf/rpm concurrently with dnf.
+# install_waagent.sh restarts waagent at the end of install.sh.
+systemctl stop waagent.service 2>/dev/null || true
+
 # Install Kernel dependencies
 if [ "$ARCHITECTURE" = "aarch64" ]; then
     kernel_pkgs=(
         "kernel-hwe-devel-$(uname -r)"
+        "kernel-hwe-drivers-gpu-$(uname -r)"
         "kernel-headers"
     )
-    if azl_uses_pmc_drivers; then
-        kernel_pkgs+=("kernel-hwe-drivers-gpu-$(uname -r)")
-    fi
     dnf install -y "${kernel_pkgs[@]}"
 else
     kernel_pkgs=(
         "kernel-headers-$(uname -r)"
         "kernel-devel-$(uname -r)"
+        "kernel-drivers-gpu-$(uname -r)"
     )
     if azl_uses_pmc_drivers; then
-        kernel_pkgs+=("kernel-drivers-gpu-$(uname -r)" "dkms")
+        kernel_pkgs+=("dkms")
     fi
     dnf install -y "${kernel_pkgs[@]}"
 fi

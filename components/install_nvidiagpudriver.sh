@@ -134,6 +134,9 @@ else
         dkms install --no-depmod -m nvidia -v ${NVIDIA_DRIVER_VERSION} -k `uname -r` --force
         check_dkms_status nvidia
     fi
+    if is_azl_dkms_enabled && ! grep -qs 'blacklist nouveau' /etc/modprobe.d/*.conf /usr/lib/modprobe.d/*.conf; then
+        echo "blacklist nouveau" >> /etc/modprobe.d/blacklist.conf
+    fi
     # nvidia-peermem is NOT modprobe'd at build time -- see comment in the
     # Ubuntu branch above. The module is queued for first boot via
     # /etc/modules-load.d/nvidia-peermem.conf written below and via the
@@ -158,7 +161,10 @@ if [[ "$TARGET_NODE_TYPE" != "azure_vm_akshost" ]]; then
     if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
         # NVIDIA APT repo already configured during driver installation
         apt install -y cuda-toolkit-${CUDA_DRIVER_VERSION//./-}
-    elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then    
+    elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
+        # Download before installing so dependency resolution and the RPM transaction
+        # happen together without a multi-minute download window.
+        dnf install -y --downloadonly cuda-toolkit-${CUDA_DRIVER_VERSION//./-}
         dnf install -y cuda-toolkit-${CUDA_DRIVER_VERSION//./-}
     else
         # RHEL-family: AlmaLinux, Rocky Linux, RHEL, etc.
