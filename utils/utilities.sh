@@ -233,7 +233,7 @@ function _is_ncv6_sku {
 # Private helper that matches current MRC scope.
 # MRC currently applies to baremetal_1p regardless of SKU.
 function _is_mrc_network {
-    [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" == "baremetal_1p" ]]
+    [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" == "baremetal_1p" && "${SKU:-}" != "MI455X" ]]
 }
 
 # Return current network mode for this build target.
@@ -244,6 +244,8 @@ function _is_mrc_network {
 function sku_network_mode {
     if _is_ncv6_sku; then
         echo "no_rdma"
+    elif [[ "${TARGET_NODE_TYPE:-}" == "baremetal_1p" && "${SKU:-}" == "MI455X" ]]; then
+        echo "ainic"
     elif _is_mrc_network; then
         echo "mrc"
     else

@@ -35,8 +35,11 @@ source ${UTILS_DIR}/utilities.sh
 
 ./install_utils.sh
 
-# install DOCA OFED
-$COMPONENT_DIR/install_doca.sh
+if [[ "$(sku_network_mode)" == "ainic" ]]; then
+    bash "$COMPONENT_DIR/install_ainic.sh"
+else
+    $COMPONENT_DIR/install_doca.sh
+fi
 
 if [[ "$GPU" == "AMD" ]]; then
     $COMPONENT_DIR/install_rocm.sh
@@ -96,10 +99,10 @@ rm -rf /var/intel/
 $COMPONENT_DIR/hpc-tuning.sh
 
 # install Azure Linux Agent
-$COMPONENT_DIR/install_waagent.sh
-
-# install persistent rdma naming
-$COMPONENT_DIR/install_azure_persistent_rdma_naming.sh
+if [[ "$SKU" != "MI455X" ]]; then
+    $COMPONENT_DIR/install_waagent.sh
+    $COMPONENT_DIR/install_azure_persistent_rdma_naming.sh
+fi
 
 # Install AZNFS Mount Helper
 $COMPONENT_DIR/install_aznfs.sh
@@ -111,7 +114,9 @@ $COMPONENT_DIR/install_diagnostics.sh
 $COMPONENT_DIR/install_monitoring_tools.sh
 
 # install Azure/NHC Health Checks
-$COMPONENT_DIR/install_health_checks.sh "$GPU"
+if [[ "$SKU" != "MI455X" ]]; then
+    $COMPONENT_DIR/install_health_checks.sh "$GPU"
+fi
 
 # write kernel and OS version metadata
 $COMPONENT_DIR/write_kernel_os_version.sh
@@ -125,10 +130,13 @@ $COMPONENT_DIR/add-udev-rules.sh
 $COMPONENT_DIR/copy_test_file.sh
 
 # disable cloud-init
-$COMPONENT_DIR/disable_cloudinit.sh
-
-# SKU Customization
-$COMPONENT_DIR/setup_sku_customizations.sh
+if [[ "$SKU" == "MI455X" ]]; then
+    rm -rf -- "$TOP_DIR/internal_bits/mi455x"
+    printf 'datasource_list: [NoCloud, None]\n' > /etc/cloud/cloud.cfg.d/99-mi455x-datasource.cfg
+else
+    $COMPONENT_DIR/disable_cloudinit.sh
+    $COMPONENT_DIR/setup_sku_customizations.sh
+fi
 
 # scan vulnerabilities using Trivy
 $COMPONENT_DIR/trivy_scan.sh

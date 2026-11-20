@@ -23,6 +23,12 @@ if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
     rccl_version=$(awk -F '"' '/^set\(PACKAGE_VERSION "/ {print $2; exit}' /opt/rocm/lib/cmake/rccl/rccl-config-version.cmake)
     [[ "$rccl_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
     write_component_version "RCCL" "$rccl_version"
+    if [[ "${SKU:-}" == "MI455X" && "${TARGET_NODE_TYPE:-}" == "baremetal_1p" ]]; then
+        # Ship the packaged library without building the hardware-validation suite.
+        mkdir -p /opt/rccl
+        ln -sfn /opt/rocm/lib /opt/rccl/lib
+        exit 0
+    fi
 elif [[ $DISTRIBUTION == "azurelinux3.0" ]]; then
     dnf install -y rccl rccl-devel rccl-unittests
     write_component_version "RCCL" "$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' rccl)"

@@ -33,18 +33,18 @@ EOF
 
 if [[ $DISTRIBUTION == "ubuntu26.04" ]]; then
     driver_metadata=$(get_component_config "amdgpu")
-    driver_version=$(jq -er '.version' <<< "$driver_metadata")
-    driver_url="https://repo.radeon.com/amdgpu/${driver_version}/ubuntu"
-    rocm_package="amdrocm-core-sdk${rocm_version}"
+    rocm_package=$(jq -r '.package // empty' <<< "$rocm_metadata")
+    rocm_packages=("${rocm_package:-amdrocm-core-sdk${rocm_version}}")
+    if [[ "$(jq -r '.rvs != false' <<< "$rocm_metadata")" == "true" ]]; then
+        rocm_packages+=(amdrocm10-rvs)
+    fi
 
     apt install -y ca-certificates wget gnupg dkms "linux-headers-$(uname -r)"
     install -d -m 0755 /etc/apt/keyrings
     wget -O /tmp/amdrocm-packages.key https://stable.repo.amd.com/rocm/gpg/packages.gpg
     gpg --batch --yes --dearmor -o /etc/apt/keyrings/amdrocm.gpg /tmp/amdrocm-packages.key
-    wget -O /tmp/amdgpu-packages.key https://repo.radeon.com/rocm/rocm.gpg.key
-    gpg --batch --yes --dearmor -o /etc/apt/keyrings/amdgpu.gpg /tmp/amdgpu-packages.key
-    chmod 0644 /etc/apt/keyrings/amdrocm.gpg /etc/apt/keyrings/amdgpu.gpg
-    rm -f /tmp/amdrocm-packages.key /tmp/amdgpu-packages.key
+    chmod 0644 /etc/apt/keyrings/amdrocm.gpg
+    rm -f /tmp/amdrocm-packages.key
 
     cat > /etc/apt/sources.list.d/amdrocm-stable.sources <<EOF
 Types: deb
@@ -54,21 +54,46 @@ Components: main
 Architectures: amd64
 Signed-By: /etc/apt/keyrings/amdrocm.gpg
 EOF
-    cat > /etc/apt/sources.list.d/amdgpu.list <<EOF
+    if [[ "$(jq -r '.source // "public"' <<< "$driver_metadata")" == "private" ]]; then
+        bundle="$TOP_DIR/internal_bits/mi455x"
+        driver_package=$(jq -er '.amdgpu.driver_package | select(test("^[A-Za-z0-9][A-Za-z0-9._+~-]*\\.deb$"))' "$bundle/manifest.json")
+        firmware_package=$(jq -er '.amdgpu.firmware_package | select(test("^[A-Za-z0-9][A-Za-z0-9._+~-]*\\.deb$"))' "$bundle/manifest.json")
+        driver_packages=("$bundle/$driver_package" "$bundle/$firmware_package")
+    else
+        driver_version=$(jq -er '.version' <<< "$driver_metadata")
+        driver_url="https://repo.radeon.com/amdgpu/${driver_version}/ubuntu"
+        wget -O /tmp/amdgpu-packages.key https://repo.radeon.com/rocm/rocm.gpg.key
+        gpg --batch --yes --dearmor -o /etc/apt/keyrings/amdgpu.gpg /tmp/amdgpu-packages.key
+        chmod 0644 /etc/apt/keyrings/amdgpu.gpg
+        rm -f /tmp/amdgpu-packages.key
+        cat > /etc/apt/sources.list.d/amdgpu.list <<EOF
 deb [arch=amd64 signed-by=/etc/apt/keyrings/amdgpu.gpg] ${driver_url} resolute main
 EOF
-    cat > /etc/apt/sources.list.d/rvs.list <<EOF
+        driver_packages=(amdgpu-dkms amdgpu-dkms-firmware)
+    fi
+    if [[ "${rocm_packages[-1]}" == "amdrocm10-rvs" ]]; then
+        cat > /etc/apt/sources.list.d/rvs.list <<EOF
 deb [arch=amd64 signed-by=/etc/apt/keyrings/amdrocm.gpg] https://stable.repo.amd.com/rocm/extras/rvs/packages/ubuntu2604/ stable main
 EOF
+    fi
     apt update
-    configure_amdgpu_dkms_patches
-    apt install -y amdgpu-dkms amdgpu-dkms-firmware
+    if [[ "${driver_packages[0]}" == "amdgpu-dkms" ]]; then
+        configure_amdgpu_dkms_patches
+    fi
+    if ! apt install -y "${driver_packages[@]}"; then
+        for build_log in /var/lib/dkms/amdgpu/*/build/make.log; do
+            [[ ! -f "$build_log" ]] || tail -n 100 "$build_log" >&2
+        done
+        exit 1
+    fi
     check_dkms_status amdgpu
-    apt install -y "$rocm_package" amdrocm10-rvs
+    apt install -y "${rocm_packages[@]}"
     rocm_version=$(cat /opt/rocm/core/.info/version)
     write_component_version "AMDGPU" "$(dpkg-query -W -f='${Version}' amdgpu-dkms)"
-    rvs_version=$(dpkg-query -W -f='${Version}' amdrocm10-rvs)
-    write_component_version "RVS" "$rvs_version"
+    if [[ "${rocm_packages[-1]}" == "amdrocm10-rvs" ]]; then
+        rvs_version=$(dpkg-query -W -f='${Version}' amdrocm10-rvs)
+        write_component_version "RVS" "$rvs_version"
+    fi
 
     # amdrocm-core-sdk ships no ld.so.conf entry, so libamdhip64 is unresolvable
     # for anything linking ROCm (e.g. Open MPI's accelerator component) without it.
@@ -145,6 +170,12 @@ EOF
 udevadm control --reload-rules && sudo udevadm trigger
 
 write_component_version "ROCM" ${rocm_version}
+
+# The deferred Hyper-V device probe below is not valid on MI455X bare metal.
+if [[ "${SKU:-}" == "MI455X" && "${TARGET_NODE_TYPE:-}" == "baremetal_1p" ]]; then
+    update-initramfs -u -k all
+    exit 0
+fi
 
 if [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     echo blacklist amdgpu | tee -a /etc/modprobe.d/blacklist.conf

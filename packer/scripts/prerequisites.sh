@@ -429,6 +429,30 @@ install_ubuntu_lts_kernel() {
             apt autoremove -y
             apt upgrade -y
 
+            if [[ "${GPU_SKU}" == "MI455X" && "${TARGET_NODE_TYPE:-}" == "baremetal_1p" ]]; then
+                apt install -y initramfs-tools
+                cat > /etc/default/grub.d/99-local-recovery.cfg <<'EOF'
+GRUB_FORCE_PARTUUID=""
+GRUB_DISABLE_INITRD=false
+GRUB_DISABLE_RECOVERY=false
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=10
+GRUB_TERMINAL="console serial"
+GRUB_SERIAL_COMMAND="serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1"
+GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} console=tty0 console=ttyS0,115200n8"
+GRUB_CMDLINE_LINUX_RECOVERY="systemd.unit=rescue.target SYSTEMD_SULOGIN_FORCE=1"
+EOF
+                local image installed_kernel
+                for image in /boot/vmlinuz-7.0.*-azure; do
+                    [[ -f "$image" ]]
+                    installed_kernel=${image#/boot/vmlinuz-}
+                    if [[ -s "/boot/initrd.img-${installed_kernel}" ]]; then
+                        update-initramfs -u -k "$installed_kernel"
+                    else
+                        update-initramfs -c -k "$installed_kernel"
+                    fi
+                done
+            fi
             update-grub
             ;;
 

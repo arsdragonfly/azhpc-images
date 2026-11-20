@@ -208,6 +208,26 @@ build {
     ]
   }
 
+  provisioner "shell-local" {
+    name           = "(MI455X) Verify and stage private driver packages"
+    except         = local.mi455x_baremetal ? [] : ["azure-arm.hpc"]
+    inline_shebang = "/bin/bash -e"
+    environment_vars = [
+      "BUNDLE_CONTAINER=${var.internal_bits_container_name}",
+      "BUNDLE_BLOB=${var.internal_bits_blob_name}",
+      "BUNDLE_SHA256=${var.internal_bits_sha256}",
+    ]
+    inline = [
+      "bundle=$(mktemp)",
+      "trap 'rm -f -- \"$bundle\"' EXIT",
+      "az storage blob download --account-name azhpcstoralt --auth-mode login -c \"$BUNDLE_CONTAINER\" -n \"$BUNDLE_BLOB\" -f \"$bundle\" --no-progress --only-show-errors",
+      "printf '%s  %s\\n' \"$BUNDLE_SHA256\" \"$bundle\" | sha256sum --check --strict",
+      "test ! -e '${path.root}/../internal_bits/mi455x'",
+      "tar -xzf \"$bundle\" --no-same-owner -C '${path.root}/..' internal_bits/mi455x",
+      "test -s '${path.root}/../internal_bits/mi455x/manifest.json' || { echo 'MI455X driver archive is missing internal_bits/mi455x/manifest.json' >&2; exit 1; }",
+    ]
+  }
+
   provisioner "shell" {
     name           = "Create azhpc-images directory"
     inline_shebang = var.default_inline_shebang
@@ -243,7 +263,7 @@ build {
 
   provisioner "file" {
     name        = "(Baremetal 1P) Upload baremetal overlay files"
-    except      = (local.target_node_type == "baremetal_1p") ? [] : ["azure-arm.hpc"]
+    except      = local.specialized_sig ? [] : ["azure-arm.hpc"]
     source      = "${path.root}/../../baremetal/"
     destination = "/home/${local.ssh_username}/azhpc-images"
   }
@@ -271,7 +291,7 @@ build {
       "REFRESH_MODE=${local.refresh_mode}",
     ]
     inline = [
-      "cd /home/${local.ssh_username}/azhpc-images/distros/${local.os_script_folder_name}/; if [[ \"${local.target_node_type}\" == \"baremetal_1p\" ]]; then bash ${local.install_script_name} ${local.gpu_platform} ${local.gpu_sku} \"${var.ado_access_token}\" \"${local.baremetal_1p_login_user}\" \"${var.baremetal_1p_login_passwd}\"; else bash ${local.install_script_name} ${local.gpu_platform} ${local.gpu_sku}; fi",
+      "cd /home/${local.ssh_username}/azhpc-images/distros/${local.os_script_folder_name}/; if [[ \"${local.specialized_sig}\" == \"true\" ]]; then bash ${local.install_script_name} ${local.gpu_platform} ${local.gpu_sku} \"${var.ado_access_token}\" \"${local.baremetal_1p_login_user}\" \"${var.baremetal_1p_login_passwd}\"; else bash ${local.install_script_name} ${local.gpu_platform} ${local.gpu_sku}; fi",
     ]
   }
 
@@ -517,7 +537,8 @@ build {
     skip_clean     = true
     inline_shebang = "/bin/bash -e"
     environment_vars = [
-      "TARGET_NODE_TYPE=${local.target_node_type}"
+      "TARGET_NODE_TYPE=${local.target_node_type}",
+      "GENERALIZED_BAREMETAL=${local.mi455x_baremetal}",
     ]
     inline = local.skip_create_artifacts ? [
       "echo 'Skipping deprovision epilog (skip_create_artifacts=true)'"

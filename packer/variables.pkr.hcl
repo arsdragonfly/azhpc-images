@@ -144,6 +144,7 @@ locals {
     "Standard_ND96asr_v4"                   = "A100"
     "Standard_ND96amsr_A100_v4"             = "A100"
     "Standard_ND96isr_MI300X_v5"            = "MI300X"
+    "MI455X_BAREMETAL"                      = "MI455X"
     "Standard_ND128isr_NDR_GB200_v6"        = "GB200"
     "Standard_ND128isr_GB300_v6"            = "GB200"
     "ND144ISR_ETH_GB200_METAL_V6"           = "GB200"
@@ -156,7 +157,7 @@ locals {
   # compatible-size scheduling) must not be treated as the target's GPU SKU.
   build_gpu_sku = lookup(local.vm_size_gpu_sku_map, local.build_vm_size, "")
   gpu_platform = (
-    local.gpu_sku == "MI300X" ? "AMD" : "NVIDIA"
+    contains(["MI300X", "MI455X"], local.gpu_sku) ? "AMD" : "NVIDIA"
   )
 }
 
@@ -675,6 +676,12 @@ variable "internal_bits_blob_name" {
   default     = env("INTERNAL_BITS_BLOB_NAME")
 }
 
+variable "internal_bits_sha256" {
+  type        = string
+  description = "SHA-256 of the required MI455X private driver archive"
+  default     = env("INTERNAL_BITS_SHA256")
+}
+
 # =============================================================================
 # Target Node Feature Variables
 # =============================================================================
@@ -699,6 +706,7 @@ locals {
     "Standard_ND96asr_v4"                   = ["azure_vm_regular"]
     "Standard_ND96amsr_A100_v4"             = ["azure_vm_regular"]
     "Standard_ND96isr_MI300X_v5"            = ["azure_vm_regular"]
+    "MI455X_BAREMETAL"                      = ["baremetal_1p"]
     "Standard_ND128isr_NDR_GB200_v6"        = ["azure_vm_regular", "azure_vm_akshost", "baremetal_3p"]
     "Standard_ND128isr_GB300_v6"            = ["azure_vm_regular", "azure_vm_akshost"]
     "Standard_ND128isr_VR200_v6"            = ["azure_vm_regular"]
@@ -714,6 +722,20 @@ locals {
 
 locals {
   nvlink_rackscale = startswith(local.gpu_sku, "GB") || startswith(local.gpu_sku, "VR")
+  mi455x_baremetal = local.gpu_sku == "MI455X" && local.target_node_type == "baremetal_1p"
+  specialized_sig = local.target_node_type == "baremetal_1p" && !local.mi455x_baremetal
+  _mi455x_valid = !local.mi455x_baremetal || (
+    local.os_version == "ubuntu_26.04" && local.kernel_version == "7.0" &&
+    local.build_vm_size != local.target_vm_size &&
+    local.create_image && local.is_experimental_image && local.create_vhd &&
+    (var.sig_image_name == "" || var.sig_image_name == "Experimental") &&
+    !local.refresh_mode && !var.skip_hpc && !local.skip_prerequisites &&
+    can(regex("^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$", var.internal_bits_container_name)) &&
+    can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*$", var.internal_bits_blob_name)) &&
+    lower(var.internal_bits_blob_name) != "none" &&
+    can(regex("^[a-f0-9]{64}$", var.internal_bits_sha256))
+  )
+  _mi455x_check = local._mi455x_valid ? true : file("ERROR: MI455X requires Ubuntu 26.04/kernel 7.0, an Azure build VM, Experimental SIG plus VHD, and a private driver archive with SHA-256.")
 }
 
 # =============================================================================
@@ -743,7 +765,7 @@ variable "baremetal_1p_login_passwd" {
 
 locals {
   baremetal_1p_login_user = coalesce(var.baremetal_1p_login_user, local.ssh_username)
-  _baremetal_1p_creds_valid = local.target_node_type != "baremetal_1p" || (
+  _baremetal_1p_creds_valid = !local.specialized_sig || (
     var.ado_access_token != null && var.ado_access_token != "" &&
     local.baremetal_1p_login_user != null && local.baremetal_1p_login_user != "" &&
     var.baremetal_1p_login_passwd != null && var.baremetal_1p_login_passwd != ""

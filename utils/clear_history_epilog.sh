@@ -215,7 +215,7 @@ verify_final_cleanup
 
 # Switch to the root user
 sudo -s <<EOF
-if [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" != "baremetal_1p" ]]; then
+if [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" != "baremetal_1p" || "${GENERALIZED_BAREMETAL:-false}" == "true" ]]; then
     # Empty machine information
     cat /dev/null > /etc/machine-id
 
@@ -240,7 +240,7 @@ then
     sed -i '$ d' /etc/sysconfig/network-scripts/ifcfg-eth0
 fi
 
-if [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" != "baremetal_1p" ]]; then
+if [[ "${TARGET_NODE_TYPE:-azure_vm_regular}" != "baremetal_1p" || "${GENERALIZED_BAREMETAL:-false}" == "true" ]]; then
     # Clear the sudoers.d folder - last user information
     (
         shopt -s dotglob nullglob
