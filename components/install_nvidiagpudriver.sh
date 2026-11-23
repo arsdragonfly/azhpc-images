@@ -72,6 +72,15 @@ elif is_azl_dkms_enabled && [[ "$SKU" != "V100" ]]; then
         "nvidia-modprobe*" \
         "nvidia-persistenced*" \
         "libnvidia-*"
+    # nvidia-kmod-common ships /etc/default/grub.d/nvidia.cfg with a hardcoded
+    # GRUB_CMDLINE_LINUX="..." that overwrites /etc/default/grub (dropping
+    # ipv6.disable=1 and selinux=0). Rewrite it to append and regenerate GRUB.
+    if [[ -f /etc/default/grub.d/nvidia.cfg ]]; then
+        cat <<'EOF' > /etc/default/grub.d/nvidia.cfg
+GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} rd.driver.blacklist=nouveau rd.driver.blacklist=nova-core"
+EOF
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+    fi
     echo 'options nvidia NVreg_RestrictProfilingToAdminUsers=0' | tee /etc/modprobe.d/nvprofiling.conf
 elif [[ $DISTRIBUTION == *"ubuntu"* ]]; then
     # APT-based NVIDIA driver installation for Ubuntu
